@@ -31,6 +31,7 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
@@ -41,3 +42,16 @@ example
 # generated native folders
 /ios
 /android
+
+# md file not needed
+building & migration-code/
+gambar-mentioned/
+icon-resorce/
+Summary.md
+SUPABASE-CONNECT.md
+POLICY-RULES.md
+PRODUCTION-PREP.md
+change-plan.md
+BARCODE-SETUP.md
+figma-folder/    
+SUPABASE-CONNECT.md.swp
