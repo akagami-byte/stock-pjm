@@ -11,6 +11,7 @@
     "crypto-browserify": "^3.12.1",
     "crypto-js": "^4.2.0",
     "expo": "~54.0.35",
+    "expo-build-properties": "~0.14.0",
     "expo-camera": "~17.0.10",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
@@ -53,6 +54,8 @@
   "devDependencies": {
     "@types/crypto-js": "^4.2.2",
     "@types/react": "~19.1.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"
   },
   "scripts": {
