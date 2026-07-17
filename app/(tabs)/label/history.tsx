@@ -105,7 +105,7 @@ export default function PrintHistoryScreen() {
         <View style={styles.empty}>
           <Icon name="document" size={48} color={colors.mutedSoft} />
           <Text style={styles.emptyText}>Belum ada riwayat cetak</Text>
-          <Text style={styles.emptyHint}>Gunakan "Cetak & Simpan" saat mencetak label</Text>
+          <Text style={styles.emptyHint}>Gunakan &ldquo;Cetak & Simpan&rdquo; saat mencetak label</Text>
         </View>
       ) : (
         <FlatList

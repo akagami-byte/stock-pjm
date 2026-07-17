@@ -30,7 +30,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     await db.runAsync(
       `INSERT INTO _sync_queue (table_name, operation, record_id, payload)
        VALUES (?, ?, ?, ?)`,
-      item.table,
+      item.table_name,
       item.operation,
       item.record_id,
       JSON.stringify(item.payload)
@@ -46,7 +46,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     set({ isSyncing: true, error: null })
     try {
       const db = await getDatabase()
-      const queue = await db.getAllAsync<{ id: number; table_name: string; operation: string; payload: string }>(
+      const queue = await db.getAllAsync<{ id: number; table_name: string; operation: string; record_id: string; payload: string }>(
         "SELECT * FROM _sync_queue WHERE synced_at IS NULL ORDER BY id ASC"
       )
 

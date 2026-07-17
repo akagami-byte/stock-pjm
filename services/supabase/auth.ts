@@ -33,10 +33,13 @@ export async function getCurrentUser(): Promise<User | null> {
   const { data, error } = await supabase.auth.getUser()
   if (error || !data.user) return null
 
+  const email = data.user.email ?? ''
   return {
     id: data.user.id,
-    email: data.user.email ?? '',
+    email,
     full_name: data.user.user_metadata?.full_name ?? null,
     avatar_url: data.user.user_metadata?.avatar_url ?? null,
+    is_premium: false,
+    role: 'staff' as const,
   }
 }

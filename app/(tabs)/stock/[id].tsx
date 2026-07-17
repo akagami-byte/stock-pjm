@@ -521,7 +521,7 @@ export default function StockDetailScreen() {
                             setShowCompanyDropdown(false)
                           }}
                         >
-                          <Text style={styles.dropNewText}>+ Buat baru: "{companySearch.trim()}"</Text>
+                          <Text style={styles.dropNewText}>+ Buat baru: &ldquo;{companySearch.trim()}&rdquo;</Text>
                         </Pressable>
                       )}
                   </View>

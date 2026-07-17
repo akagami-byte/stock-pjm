@@ -1,0 +1,14 @@
+diff --git a/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/RNGestureHandlerPackage.kt b/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/RNGestureHandlerPackage.kt
+index e271a3e..2e87a70 100644
+--- a/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/RNGestureHandlerPackage.kt
++++ b/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/RNGestureHandlerPackage.kt
+@@ -38,9 +38,6 @@ class RNGestureHandlerPackage :
+ 
+   override fun getViewManagerNames(reactContext: ReactApplicationContext) = viewManagers.keys.toList()
+ 
+-  override fun getViewManagers(reactContext: ReactApplicationContext): MutableList<ModuleSpec> =
+-    viewManagers.values.toMutableList()
+-
+   override fun createViewManager(reactContext: ReactApplicationContext, viewManagerName: String) =
+     viewManagers[viewManagerName]?.provider?.get() as? ViewManager<*, *>
+ 
