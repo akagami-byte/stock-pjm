@@ -9,25 +9,22 @@ if (fs.existsSync(envPath)) {
   envVars = config({ path: envPath }).parsed || {}
 }
 
-// Load base config from app.json
-const appJson = require('./app.json')
+// Forward all variables from the manual .env file
+const extra = { ...envVars }
 
-// Forward all EXPO_PUBLIC_* vars into extra so they're accessible
-// via expo-constants at runtime (more reliable than process.env in RN)
-const extra = {
-  ...appJson.expo.extra,
-}
-
-for (const [key, value] of Object.entries(envVars)) {
+// Also forward all EXPO_PUBLIC_* keys from process.env (for EAS build secrets)
+for (const [key, value] of Object.entries(process.env)) {
   if (key.startsWith('EXPO_PUBLIC_')) {
     extra[key] = value
   }
 }
 
-module.exports = {
-  ...appJson,
-  expo: {
-    ...appJson.expo,
-    extra,
-  },
+module.exports = ({ config }) => {
+  return {
+    ...config,
+    extra: {
+      ...config.extra,
+      ...extra,
+    },
+  }
 }

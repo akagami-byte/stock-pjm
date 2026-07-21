@@ -57,3 +57,17 @@ figma-folder/
 SUPABASE-CONNECT.md.swp
 DEPENDENCY.md
 BUILD_SETUP.md
+
+# credentials & signing keys
+credentials.json
+/credentials/
+
+# build artifacts
+*.apk
+*.apks
+*.aab
+*.ipa
+
+#folder not used
+extracted_apks/
+bundletool.jar
