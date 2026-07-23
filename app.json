@@ -5,10 +5,11 @@
     "owner": "stock-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/images/stockaja-logo-square.png",
     "scheme": "pjmstock",
     "userInterfaceStyle": "dark",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/stockaja-logo-square.png",
       "infoPlist": {
         "NSCameraUsageDescription": "Kamera digunakan untuk scan barcode label stok",
         "NSPhotoLibraryUsageDescription": "Akses galeri diperlukan untuk upload gambar produk",
@@ -16,6 +17,10 @@
       }
     },
     "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A",
+        "foregroundImage": "./assets/images/stockaja-logo-square.png"
+      },
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -34,7 +39,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0F172A"
+          "backgroundColor": "#0F172A",
+          "image": "./assets/images/stockaja-logo-square.png",
+          "imageWidth": 200
         }
       ],
       [

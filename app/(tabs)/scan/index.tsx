@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState, useRef } from 'react'
 import {
   View, Text, FlatList, Pressable, TextInput,
   ActivityIndicator, StyleSheet, Vibration,
-} from 'react-native'
+ Alert, Modal } from 'react-native'
 import { useCameraPermissions } from 'expo-camera'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { useIsFocused } from '@react-navigation/native'
@@ -12,7 +12,6 @@ import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { useBatchStore } from '@/stores/batchStore'
 import { colors, typography, radius, SCANNER } from '@/constants'
-import { Alert, Modal } from 'react-native'
 
 export default function ScanScreen() {
   const router = useRouter()
