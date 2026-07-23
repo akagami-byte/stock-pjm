@@ -5,7 +5,6 @@
     "owner": "stock-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
     "scheme": "pjmstock",
     "userInterfaceStyle": "dark",
     "ios": {
@@ -17,12 +16,6 @@
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#0F172A",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -34,17 +27,14 @@
       "package": "com.akagamibyte.pjmstock"
     },
     "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "output": "static"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0F172A",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#0F172A"
         }
       ],
       [
