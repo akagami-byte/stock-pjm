@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ProductStore, Product, ProductType, ProductVariant, CreateProductTypeInput, CreateProductInput, UpdateProductInput, CreateVariantInput, UpdateVariantInput } from '@/types'
+import type { ProductStore, Product, ProductType, ProductVariant, CreateProductTypeInput, UpdateProductTypeInput, CreateProductInput, UpdateProductInput, CreateVariantInput, UpdateVariantInput } from '@/types'
 import { getQuery, getAuthUser } from '@/lib/dataRouter'
 
 /**
@@ -96,6 +96,7 @@ export const useProductStore = create<ProductStore>((set, get) => ({
         .insert({
           type_code: input.type_code.toUpperCase().trim(),
           type_name: input.type_name.trim(),
+          image_url: input.image_url ?? null,
           is_active: true,
           created_by: userData.user?.id ?? null,
         } as any)
@@ -112,6 +113,35 @@ export const useProductStore = create<ProductStore>((set, get) => ({
       return productType
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal membuat jenis produk'
+      set({ error: message, loading: false })
+      throw error
+    }
+  },
+
+  updateProductType: async (typeId: string, input: UpdateProductTypeInput) => {
+    set({ loading: true, error: null })
+    try {
+      const updatePayload: any = {
+        updated_at: new Date().toISOString()
+      }
+      if (input.type_name !== undefined) updatePayload.type_name = input.type_name
+      if (input.image_url !== undefined) updatePayload.image_url = input.image_url
+      if (input.is_active !== undefined) updatePayload.is_active = input.is_active
+
+      const { error } = await getQuery('product_types')
+        .update(updatePayload)
+        .eq('type_id', typeId)
+
+      if (error) throw error
+
+      set((s) => ({
+        productTypes: s.productTypes.map((pt) =>
+          pt.type_id === typeId ? { ...pt, ...input } : pt
+        ),
+        loading: false,
+      }))
+    } catch (error: any) {
+      const message = error?.message || error?.details || 'Gagal memperbarui jenis produk'
       set({ error: message, loading: false })
       throw error
     }

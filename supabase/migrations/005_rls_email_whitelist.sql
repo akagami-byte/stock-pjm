@@ -1,5 +1,5 @@
 -- Migration 005: Replace open RLS with email whitelist
--- Only 2 internal (premium) users can read/write Supabase.
+-- Only premium/internal users can read/write Supabase.
 -- External users: RLS returns empty → app falls back to SQLite.
 
 BEGIN;
@@ -10,8 +10,8 @@ RETURNS BOOLEAN AS $$
 BEGIN
   RETURN auth.email() IN (
     'rehanforic@gmail.com',
-    'handivanda@protonmail.com'
-    'staff@bengkel.com',
+    'handivanda@protonmail.com',
+    'hanvankernel@gmail.com'
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -6,6 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
   RefreshControl,
+  Image,
   StyleSheet,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -16,11 +17,13 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { useDashboardStore } from '@/stores/dashboardStore'
 import { useProductStore } from '@/stores/productStore'
+import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatCurrency } from '@/utils/formatters'
 
 export default function DashboardScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const role = useAuthStore((s) => s.user?.role ?? 'staff')
   const {
     summary,
     reservedBatches,
@@ -33,10 +36,14 @@ export default function DashboardScreen() {
   const { productTypes, fetchProductTypes, fetchProducts } = useProductStore()
 
   useEffect(() => {
+    if (role === 'staff') {
+      router.replace('/label')
+      return
+    }
     fetchDashboardData()
     fetchProductTypes()
     fetchProducts()
-  }, [])
+  }, [role])
 
   const onRefresh = useCallback(() => {
     fetchDashboardData()
@@ -48,10 +55,18 @@ export default function DashboardScreen() {
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor="#3B82F6" />}
     >
-      {/* Header with subtitle */}
-      <View style={styles.headerBlock}>
-        <Text style={styles.subtitle}>Bengkel Las Maju</Text>
-        <Text style={styles.heading}>Stock Dashboard</Text>
+      {/* Header with subtitle and Settings button */}
+      <View style={styles.headerRow}>
+        <View style={styles.headerBlock}>
+          <Text style={styles.subtitle}>Bengkel Las Maju</Text>
+          <Text style={styles.heading}>Stock Dashboard</Text>
+        </View>
+        <Pressable
+          style={({ pressed }) => [styles.settingsBtn, pressed && styles.quickBtnPressed]}
+          onPress={() => router.push('/settings')}
+        >
+          <Text style={{ fontSize: 20 }}>⚙️</Text>
+        </Pressable>
       </View>
 
       {/* Summary Cards */}
@@ -121,7 +136,11 @@ export default function DashboardScreen() {
                 onPress={() => router.push({ pathname: '/master/[id]', params: { id: pt.type_id } })}
               >
                 <View style={styles.masterIconWrap}>
-                  <Text style={styles.masterIcon}>📦</Text>
+                  {pt.image_url ? (
+                    <Image source={{ uri: pt.image_url }} style={styles.masterImage} />
+                  ) : (
+                    <Text style={styles.masterIcon}>📦</Text>
+                  )}
                 </View>
                 <Text style={styles.masterName} numberOfLines={2}>{pt.type_name}</Text>
                 <Text style={styles.masterCode}>{pt.type_code}</Text>
@@ -246,7 +265,15 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: 16, gap: 12 },
-  headerBlock: { marginBottom: 4 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  headerBlock: {},
+  settingsBtn: {
+    padding: 8,
+    backgroundColor: colors.surfaceCard,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
   subtitle: { fontSize: 13, color: colors.muted, fontFamily: typography.font.sansMedium },
   heading: { fontSize: 24, fontWeight: '700', color: colors.ink, fontFamily: typography.font.sansBold },
   summaryRow: { flexDirection: 'row', gap: 8 },
@@ -295,7 +322,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceCard,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  masterImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   masterIcon: { fontSize: 20 },
   masterName: { fontSize: 11, color: colors.ink, fontWeight: '600', textAlign: 'center' },
   masterCode: { fontSize: 10, color: colors.muted, fontFamily: 'monospace' },

@@ -2,12 +2,13 @@ import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import type { AuthStore, User, AuthSession } from '@/types'
 
-const PREMIUM_EMAILS = ['rehanforic@gmail.com', 'handivanda@protonmail.com', 'staff@bengkel.com'];
+const PREMIUM_EMAILS = ['rehanforic@gmail.com', 'handivanda@protonmail.com', 'hanvankernel@gmail.com'];
 
 const OWNER_EMAILS = ['rehanforic@gmail.com', 'handivanda@protonmail.com'];
 
 function getUserRole(email: string): 'owner' | 'staff' {
-  return OWNER_EMAILS.includes(email) ? 'owner' : 'staff';
+  if (OWNER_EMAILS.includes(email)) return 'owner';
+  return 'staff';
 }
 
 /**

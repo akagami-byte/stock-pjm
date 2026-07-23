@@ -530,9 +530,43 @@ export default function CreateTransactionScreen() {
             <Text style={styles.modalTitle}>💸 Harga Alternatif</Text>
 
             {altPriceItem !== null && cart[altPriceItem] && (
-              <Text style={styles.modalContext}>
-                {cart[altPriceItem].batch.batch_code} · Harga Master: {formatCurrency((cart[altPriceItem].batch.variant?.product?.base_price ?? 0) + (cart[altPriceItem].batch.variant?.price_modifier ?? 0))}
-              </Text>
+              <View>
+                <Text style={styles.modalContext}>
+                  {cart[altPriceItem].batch.batch_code} · Base Price: {formatCurrency(cart[altPriceItem].batch.variant?.product?.base_price ?? 0)}
+                </Text>
+                {cart[altPriceItem].batch.variant && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: colors.muted, marginBottom: 4 }}>
+                      ⚡ Pilih List Harga Modifier Varian:
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {/* Base price option */}
+                      <Pressable
+                        style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: colors.hairline, borderRadius: 6 }}
+                        onPress={() => setAltPrice((cart[altPriceItem].batch.variant?.product?.base_price ?? 0).toString())}
+                      >
+                        <Text style={{ fontSize: 12, color: colors.ink, fontWeight: '600' }}>
+                          Base: {formatCurrency(cart[altPriceItem].batch.variant?.product?.base_price ?? 0)}
+                        </Text>
+                      </Pressable>
+
+                      {/* Base + Variant Modifier option */}
+                      <Pressable
+                        style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.brand, borderRadius: 6 }}
+                        onPress={() => {
+                          const base = cart[altPriceItem].batch.variant?.product?.base_price ?? 0
+                          const mod = cart[altPriceItem].batch.variant?.price_modifier ?? 0
+                          setAltPrice((base + mod).toString())
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, color: '#FFF', fontWeight: '600' }}>
+                          +Mod ({formatCurrency(cart[altPriceItem].batch.variant?.price_modifier ?? 0)}): {formatCurrency((cart[altPriceItem].batch.variant?.product?.base_price ?? 0) + (cart[altPriceItem].batch.variant?.price_modifier ?? 0))}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+              </View>
             )}
 
             <Input

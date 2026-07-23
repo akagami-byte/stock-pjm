@@ -78,12 +78,13 @@ export default function TabLayout() {
         },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Dashboard', tabBarIcon: ({ color }) => <DashboardIcon color={color} size={20} />, href: role === 'owner' ? undefined : null }} />
+      <Tabs.Screen name="index" options={{ title: 'Dashboard', href: role === 'staff' ? null : undefined, tabBarIcon: ({ color }) => <DashboardIcon color={color} size={20} /> }} />
       <Tabs.Screen name="label"  options={{ title: 'Label',     tabBarIcon: ({ color }) => <LabelIcon color={color} size={20} /> }} />
       <Tabs.Screen name="scan"   options={{ title: 'Scan',      tabBarIcon: ({ color }) => <CameraIcon color={color} size={20} /> }} />
       <Tabs.Screen name="stock"  options={{ title: 'Stok',      tabBarIcon: ({ color }) => <BoxIcon color={color} size={20} /> }} />
-      <Tabs.Screen name="transaction" options={{ title: 'Transaksi', tabBarIcon: ({ color }) => <TransactionIcon color={color} size={20} />, href: role === 'owner' ? undefined : null }} />
+      <Tabs.Screen name="transaction" options={{ title: 'Transaksi', href: role === 'staff' ? null : undefined, tabBarIcon: ({ color }) => <TransactionIcon color={color} size={20} /> }} />
       <Tabs.Screen name="master" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   )
 }

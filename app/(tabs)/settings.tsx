@@ -1,15 +1,18 @@
-import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native'
-import { useRouter } from 'expo-router'
+import { View, Text, ScrollView, Alert, StyleSheet, Pressable, BackHandler } from 'react-native'
+import { useRouter, useNavigation } from 'expo-router'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useAuthStore } from '@/stores/authStore'
 import { colors, typography, radius } from '@/constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Icon } from '@/components/ui/Icon'
+import { useEffect } from 'react'
 
 export default function SettingsScreen() {
   const router = useRouter()
   const { user, logout } = useAuthStore()
   const insets = useSafeAreaInsets()
+  const role = useAuthStore((s) => s.user?.role ?? 'staff')
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Anda yakin ingin keluar?', [
@@ -25,8 +28,40 @@ export default function SettingsScreen() {
     ])
   }
 
+  // Staff: tombol navigasi kembali perangkat → arahkan ke Label
+  const navigation = useNavigation()
+  useEffect(() => {
+    if (role !== 'staff') return
+
+    // Intercept device back navigation (hardware back / swipe gesture)
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.replace('/label')
+      return true
+    })
+    
+    // Navigation pop (back gesture iOS, back button Android via nav)
+    const unsubBeforeRemove = navigation.addListener('beforeRemove', (e: any) => {
+      // Only intercept if navigating back (not logout, etc.)
+      if (e.data?.action?.type === 'GO_BACK' || !e.data?.action) {
+        e.preventDefault()
+        router.replace('/label')
+      }
+    })
+
+    return () => {
+      backHandler.remove()
+      unsubBeforeRemove()
+    }
+  }, [role])
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
+      {role === 'staff' && (
+        <Pressable onPress={() => router.replace('/label')} style={styles.backBtn}>
+          <Icon name="arrow-left" size={20} color={colors.body} />
+          <Text style={styles.backText}>Kembali ke Label</Text>
+        </Pressable>
+      )}
       <Text style={styles.heading}>Pengaturan</Text>
 
       {/* Profile */}
@@ -61,7 +96,7 @@ export default function SettingsScreen() {
       <Card>
         <Text style={styles.sectionTitle}>Data & Sinkronisasi</Text>
         <Button
-          title="🔄 Refresh Data"
+          title="Refresh Data"
           variant="outline"
           fullWidth
           onPress={() => Alert.alert('Info', 'Data berhasil disegarkan')}
@@ -79,6 +114,8 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: 16, gap: 12 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  backText: { fontSize: 14, color: colors.body, fontFamily: typography.font.sansMedium },
   heading: { fontSize: 22, fontWeight: '700', color: colors.ink, marginBottom: 4 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatar: {

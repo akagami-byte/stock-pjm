@@ -139,6 +139,8 @@ export interface ProductType {
   created_at: string;
   /** Last update timestamp */
   updated_at: string;
+  /** URL logo/gambar jenis produk */
+  image_url?: string | null;
 }
 
 /**
@@ -484,12 +486,19 @@ export interface InvoiceGroup {
 // 5. API REQUEST / INPUT TYPES
 // =============================================================================
 
-/** Input for creating a new product type. */
 export interface CreateProductTypeInput {
   /** Short type code, max 3 chars (e.g. "HGP") */
   type_code: string;
   /** Full type name (e.g. "Hollow Gate Pillar") */
   type_name: string;
+  /** Optional image URL */
+  image_url?: string;
+}
+
+export interface UpdateProductTypeInput {
+  type_name?: string;
+  image_url?: string;
+  is_active?: boolean;
 }
 
 /** Input for creating a new product in Master Data. */
@@ -721,6 +730,8 @@ export interface ProductStoreActions {
   fetchVariantsByProduct: (productId: string) => Promise<ProductVariant[]>;
   /** Create a new product type */
   createProductType: (input: CreateProductTypeInput) => Promise<ProductType>;
+  /** Update an existing product type */
+  updateProductType: (typeId: string, input: UpdateProductTypeInput) => Promise<void>;
   /** Create a new product in Master Data */
   createProduct: (input: CreateProductInput) => Promise<Product>;
   /** Update an existing product */

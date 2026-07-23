@@ -10,12 +10,20 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   // WAL mode — better concurrent read/write
   await db.execAsync('PRAGMA journal_mode = WAL');
 
+  // Safely add column if db already exists
+  try {
+    await db.execAsync('ALTER TABLE product_types ADD COLUMN image_url TEXT');
+  } catch (e) {
+    // Column already exists or table doesn't exist yet
+  }
+
   // ─── Schema mirror (matches Supabase) ───────────────────────────────
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS product_types (
       type_id TEXT PRIMARY KEY,
       type_code TEXT NOT NULL UNIQUE,
       type_name TEXT NOT NULL,
+      image_url TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_by TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),

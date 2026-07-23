@@ -6,6 +6,7 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
+  Image,
   StyleSheet,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -55,9 +56,12 @@ export default function MasterScreen() {
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={() => router.push({ pathname: '/master/[id]', params: { id: item.type_id } })}
     >
-      {/* Icon placeholder */}
       <View style={styles.cardIcon}>
-        <Text style={styles.cardIconText}>📦</Text>
+        {item.image_url ? (
+          <Image source={{ uri: item.image_url }} style={styles.cardIconImage} />
+        ) : (
+          <Text style={styles.cardIconText}>📦</Text>
+        )}
       </View>
 
       <View style={styles.cardContent}>
@@ -97,7 +101,11 @@ export default function MasterScreen() {
       onPress={() => router.push({ pathname: '/master/company/[id]', params: { id: item.company_id } })}
     >
       <View style={styles.cardIcon}>
-        <Text style={styles.cardIconText}>🏢</Text>
+        {item.image_url ? (
+          <Image source={{ uri: item.image_url }} style={styles.cardIconImage} />
+        ) : (
+          <Text style={styles.cardIconText}>🏢</Text>
+        )}
       </View>
       <View style={styles.cardContent}>
         <Text style={styles.typeName} numberOfLines={1}>
@@ -291,7 +299,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceCard,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
+  cardIconImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   cardIconText: { fontSize: 22 },
   cardContent: { flex: 1, gap: 2 },
   typeName: {

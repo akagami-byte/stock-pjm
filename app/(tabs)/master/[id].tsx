@@ -5,15 +5,21 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  Image,
+  Alert,
   StyleSheet,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import * as ImagePicker from 'expo-image-picker'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { useProductStore } from '@/stores/productStore'
 import { useBatchStore } from '@/stores/batchStore'
 import { useTransactionStore } from '@/stores/transactionStore'
+import { uploadBarcodePresigned } from '@/services/s3/uploadBarcodePresigned'
 import { colors, typography, radius, spacing, getFinishingLabel } from '@/constants'
 import { formatDate, formatCurrency } from '@/utils/formatters'
 import type { Product, ProductVariant, ProductType, StockBatchWithDetails } from '@/types'
@@ -25,7 +31,19 @@ export default function ProductTypeDetailScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
 
-  const { productTypes, products, variants, fetchProductTypes, fetchProducts, fetchProductsByType, fetchVariantsByProduct, loading: productLoading } = useProductStore()
+  const {
+    productTypes,
+    products,
+    variants,
+    fetchProductTypes,
+    fetchProducts,
+    fetchProductsByType,
+    fetchVariantsByProduct,
+    updateProductType,
+    updateProduct,
+    updateVariant,
+    loading: productLoading,
+  } = useProductStore()
   const { batches, fetchBatches, loading: batchLoading } = useBatchStore()
   const { invoiceGroups, fetchTransactions, loading: txLoading } = useTransactionStore()
 
@@ -33,6 +51,21 @@ export default function ProductTypeDetailScreen() {
   const [typeProducts, setTypeProducts] = useState<Product[]>([])
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null)
   const [productVariants, setProductVariants] = useState<Record<string, ProductVariant[]>>({})
+
+  // Modals state
+  const [editTypeModalVisible, setEditTypeModalVisible] = useState(false)
+  const [typeNameInput, setTypeNameInput] = useState('')
+  const [imageUrlInput, setImageUrlInput] = useState('')
+  const [typeImageUri, setTypeImageUri] = useState<string | null>(null)
+  const [uploadingTypeImage, setUploadingTypeImage] = useState(false)
+
+  const [editProductModalVisible, setEditProductModalVisible] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [productNameInput, setProductNameInput] = useState('')
+
+  const [editVariantModalVisible, setEditVariantModalVisible] = useState(false)
+  const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
+  const [priceModifierInput, setPriceModifierInput] = useState('')
 
   const productType = productTypes.find((pt) => pt.type_id === id)
 
@@ -49,6 +82,13 @@ export default function ProductTypeDetailScreen() {
       })
     }
   }, [id])
+
+  useEffect(() => {
+    if (productType) {
+      setTypeNameInput(productType.type_name)
+      setImageUrlInput(productType.image_url ?? '')
+    }
+  }, [productType])
 
   // When a product is expanded, load its variants
   const toggleProduct = useCallback(async (productId: string) => {
@@ -72,6 +112,119 @@ export default function ProductTypeDetailScreen() {
       fetchProductsByType(id).then(setTypeProducts)
     }
   }, [id])
+
+  const pickTypeImage = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert('Izin Diperlukan', 'Akses galeri diperlukan untuk upload gambar')
+      return
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+
+    if (!result.canceled && result.assets.length > 0) {
+      setTypeImageUri(result.assets[0].uri)
+    }
+  }
+
+  const handleSaveType = async () => {
+    if (!productType) return
+    if (!typeNameInput.trim()) {
+      Alert.alert('Error', 'Nama jenis produk tidak boleh kosong')
+      return
+    }
+    setUploadingTypeImage(true)
+    try {
+      let finalImageUrl: string | undefined = imageUrlInput.trim() || undefined
+
+      if (typeImageUri) {
+        try {
+          const res = await uploadBarcodePresigned(
+            typeImageUri,
+            `type_${productType.type_id}`,
+            'products/'
+          )
+          finalImageUrl = res.publicUrl
+        } catch (err: any) {
+          Alert.alert('Upload Gagal', err.message ?? 'Gagal upload gambar ke S3')
+          setUploadingTypeImage(false)
+          return
+        }
+      }
+
+      await updateProductType(productType.type_id, {
+        type_name: typeNameInput.trim(),
+        image_url: finalImageUrl,
+      })
+      setEditTypeModalVisible(false)
+      setTypeImageUri(null)
+      Alert.alert('Sukses', 'Jenis produk berhasil diperbarui')
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || String(e) || 'Gagal memperbarui')
+    } finally {
+      setUploadingTypeImage(false)
+    }
+  }
+
+  const handleOpenEditProduct = (prod: Product) => {
+    setEditingProduct(prod)
+    setProductNameInput(prod.product_name)
+    setEditProductModalVisible(true)
+  }
+
+  const handleSaveProduct = async () => {
+    if (!editingProduct) return
+    if (!productNameInput.trim()) {
+      Alert.alert('Error', 'Nama produk tidak boleh kosong')
+      return
+    }
+    try {
+      await updateProduct(editingProduct.product_id, {
+        product_name: productNameInput.trim(),
+      })
+      if (id) {
+        const updated = await fetchProductsByType(id)
+        setTypeProducts(updated)
+      }
+      setEditProductModalVisible(false)
+      Alert.alert('Sukses', 'Nama produk berhasil diperbarui')
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Gagal memperbarui produk')
+    }
+  }
+
+  const handleOpenEditVariant = (v: ProductVariant) => {
+    setEditingVariant(v)
+    setPriceModifierInput(v.price_modifier.toString())
+    setEditVariantModalVisible(true)
+  }
+
+  const handleSaveVariant = async () => {
+    if (!editingVariant) return
+    const modifierNum = parseFloat(priceModifierInput)
+    if (isNaN(modifierNum)) {
+      Alert.alert('Error', 'Harga modifier harus angka valid')
+      return
+    }
+    try {
+      await updateVariant(editingVariant.variant_id, {
+        price_modifier: modifierNum,
+      })
+      if (editingVariant.product_id) {
+        const updatedVars = await fetchVariantsByProduct(editingVariant.product_id)
+        setProductVariants((prev) => ({ ...prev, [editingVariant.product_id]: updatedVars }))
+      }
+      setEditVariantModalVisible(false)
+      Alert.alert('Sukses', 'Harga modifier berhasil diperbarui')
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Gagal memperbarui varian')
+    }
+  }
 
   if (!productType && !productLoading) {
     return (
@@ -116,6 +269,15 @@ export default function ProductTypeDetailScreen() {
                     Versi {product.version} · {formatCurrency(product.base_price)}/pcs
                   </Text>
                 </View>
+                <Pressable
+                  style={styles.editBtn}
+                  onPress={(e) => {
+                    e.stopPropagation()
+                    handleOpenEditProduct(product)
+                  }}
+                >
+                  <Text style={styles.editBtnText}>✏️ Edit</Text>
+                </Pressable>
                 <Text style={styles.expandIcon}>
                   {expandedProductId === product.product_id ? '▼' : '▶'}
                 </Text>
@@ -134,10 +296,16 @@ export default function ProductTypeDetailScreen() {
                           {getFinishingLabel(v.finishing)} · Modifier: {formatCurrency(v.price_modifier)}
                         </Text>
                       </View>
+                      <Pressable
+                        style={styles.editBtn}
+                        onPress={() => handleOpenEditVariant(v)}
+                      >
+                        <Text style={styles.editBtnText}>+ Modifier</Text>
+                      </Pressable>
                       <View
                         style={[
                           styles.statusDot,
-                          { backgroundColor: v.is_active ? colors.success : colors.muted },
+                          { backgroundColor: v.is_active ? colors.success : colors.muted, marginLeft: 6 },
                         ]}
                       >
                         <Text style={styles.statusDotText}>
@@ -236,6 +404,12 @@ export default function ProductTypeDetailScreen() {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>‹ Kembali</Text>
         </Pressable>
+        <Pressable
+          style={styles.editHeaderBtn}
+          onPress={() => setEditTypeModalVisible(true)}
+        >
+          <Text style={styles.editHeaderBtnText}>✏️ Edit Jenis</Text>
+        </Pressable>
       </View>
 
       <FlatList
@@ -243,9 +417,13 @@ export default function ProductTypeDetailScreen() {
         renderItem={() => null}
         ListHeaderComponent={
           <View>
-            {/* Type icon placeholder */}
+            {/* Type image */}
             <View style={styles.imageBox}>
-              <Text style={styles.imageIcon}>📦</Text>
+              {productType?.image_url ? (
+                <Image source={{ uri: productType.image_url }} style={styles.typeImage} />
+              ) : (
+                <Text style={styles.imageIcon}>📦</Text>
+              )}
             </View>
 
             {/* Type info */}
@@ -301,6 +479,121 @@ export default function ProductTypeDetailScreen() {
         onRefresh={handleRefresh}
         refreshing={productLoading || batchLoading || txLoading}
       />
+
+      {/* Modal Edit Jenis Produk */}
+      <Modal visible={editTypeModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Jenis Produk</Text>
+            
+            <Text style={styles.fieldLabel}>Nama Jenis Produk</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={typeNameInput}
+              onChangeText={setTypeNameInput}
+              placeholder="Contoh: Hollow Gate Pillar"
+              placeholderTextColor={colors.mutedSoft}
+            />
+
+            <Text style={styles.fieldLabel}>Gambar Jenis Produk</Text>
+            <Pressable
+              style={{
+                height: 120,
+                backgroundColor: colors.surfaceCard,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: colors.hairline,
+                borderStyle: 'dashed',
+                justifyContent: 'center',
+                alignItems: 'center',
+                overflow: 'hidden',
+                marginVertical: spacing.xs,
+              }}
+              onPress={pickTypeImage}
+            >
+              {typeImageUri ? (
+                <Image source={{ uri: typeImageUri }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+              ) : imageUrlInput ? (
+                <Image source={{ uri: imageUrlInput }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+              ) : (
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 24, marginBottom: 4 }}>📷</Text>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.muted }}>Ketuk untuk pilih gambar dari galeri</Text>
+                </View>
+              )}
+            </Pressable>
+
+            {(typeImageUri || imageUrlInput) ? (
+              <Button
+                title="🔄 Ganti Gambar"
+                variant="ghost"
+                size="sm"
+                onPress={pickTypeImage}
+              />
+            ) : null}
+
+            <View style={styles.modalActions}>
+              <Button title="Batal" variant="ghost" onPress={() => { setEditTypeModalVisible(false); setTypeImageUri(null); }} />
+              <Button
+                title={uploadingTypeImage ? "Uploading..." : "Simpan"}
+                onPress={handleSaveType}
+                loading={uploadingTypeImage}
+                disabled={uploadingTypeImage}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Edit Nama Produk */}
+      <Modal visible={editProductModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Nama Produk</Text>
+
+            <Text style={styles.fieldLabel}>Nama Produk</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={productNameInput}
+              onChangeText={setProductNameInput}
+              placeholder="Nama produk..."
+              placeholderTextColor={colors.mutedSoft}
+            />
+
+            <View style={styles.modalActions}>
+              <Button title="Batal" variant="ghost" onPress={() => setEditProductModalVisible(false)} />
+              <Button title="Simpan" onPress={handleSaveProduct} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Edit Harga Modifier Varian */}
+      <Modal visible={editVariantModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Harga Modifier Varian</Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 12 }}>
+              SKU: {editingVariant?.sku_full} ({getFinishingLabel(editingVariant?.finishing ?? 'C')})
+            </Text>
+
+            <Text style={styles.fieldLabel}>Harga Modifier (Rp)</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={priceModifierInput}
+              onChangeText={setPriceModifierInput}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor={colors.mutedSoft}
+            />
+
+            <View style={styles.modalActions}>
+              <Button title="Batal" variant="ghost" onPress={() => setEditVariantModalVisible(false)} />
+              <Button title="Simpan" onPress={handleSaveVariant} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -308,12 +601,43 @@ export default function ProductTypeDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   listContent: { paddingBottom: spacing.xxl },
-  header: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  header: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   backBtn: { alignSelf: 'flex-start', marginBottom: spacing.xxs },
   backText: {
     fontSize: typography.size.base,
     color: colors.brand,
     fontWeight: typography.weight.medium,
+  },
+  editHeaderBtn: {
+    backgroundColor: colors.surfaceCard,
+    borderColor: colors.hairline,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+  },
+  editHeaderBtnText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.ink,
+  },
+  editBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radius.xs,
+    marginHorizontal: 4,
+  },
+  editBtnText: {
+    fontSize: 11,
+    fontWeight: typography.weight.semibold,
+    color: colors.brand,
   },
   imageBox: {
     height: 200,
@@ -323,8 +647,52 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
+  typeImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   imageIcon: { fontSize: 48 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: colors.canvas,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  modalTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    color: colors.ink,
+    marginBottom: spacing.xs,
+  },
+  fieldLabel: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.body,
+    marginTop: 4,
+  },
+  modalInput: {
+    backgroundColor: colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    fontSize: typography.size.base,
+    color: colors.ink,
+    marginBottom: spacing.xs,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
   infoSection: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.xxs },
   typeName: {
     fontSize: typography.size['2xl'],

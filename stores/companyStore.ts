@@ -8,6 +8,7 @@ interface CompanyStore {
   error: string | null
   fetchCompanies: () => Promise<void>
   createCompany: (input: { company_name: string; address?: string; phone?: string; image_url?: string }) => Promise<Company>
+  updateCompany: (companyId: string, input: { address?: string; phone?: string; image_url?: string }) => Promise<void>
   clearError: () => void
 }
 
@@ -59,6 +60,31 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
       return company
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal membuat perusahaan'
+      set({ error: message, loading: false })
+      throw error
+    }
+  },
+
+  updateCompany: async (companyId, input) => {
+    set({ loading: true, error: null })
+    try {
+      const { error } = await getQuery('companies')
+        .update({
+          ...input,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('company_id', companyId)
+
+      if (error) throw error
+
+      set((s) => ({
+        companies: s.companies.map((c) =>
+          c.company_id === companyId ? { ...c, ...input } : c
+        ),
+        loading: false,
+      }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal memperbarui perusahaan'
       set({ error: message, loading: false })
       throw error
     }

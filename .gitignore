@@ -57,6 +57,8 @@ figma-folder/
 SUPABASE-CONNECT.md.swp
 DEPENDENCY.md
 BUILD_SETUP.md
+.github/
+.swp
 
 # credentials & signing keys
 credentials.json

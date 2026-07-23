@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { useBatchStore } from '@/stores/batchStore'
+import { useAuthStore } from '@/stores/authStore'
 import { formatDate } from '@/utils/formatters'
 import { colors, typography, radius, ALL_BATCH_STATUSES, getStatusColor, FINISHING_OPTIONS, getFinishingLabel } from '@/constants'
 import type { BatchStatus, Finishing, StockBatchWithDetails } from '@/types'
@@ -26,6 +27,7 @@ export interface PrintRecord {
 export default function LabelListScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const role = useAuthStore((s) => s.user?.role ?? 'staff')
   const { batches, loading, error, fetchBatches } = useBatchStore()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<BatchStatus | 'ALL'>('ALL')
@@ -107,6 +109,11 @@ export default function LabelListScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.heading}>Daftar Label</Text>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          {role === 'staff' && (
+            <Pressable onPress={() => router.push('/settings')} style={styles.iconBtn}>
+              <Icon name="settings" size={22} color={colors.body} />
+            </Pressable>
+          )}
           <Pressable onPress={() => router.push('/label/history')} style={styles.iconBtn}>
             <Icon name="history" size={22} color={colors.body} />
           </Pressable>

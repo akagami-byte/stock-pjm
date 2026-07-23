@@ -13,6 +13,7 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import Button from '@/components/ui/Button'
 import { useTransactionStore } from '@/stores/transactionStore'
+import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatCurrency } from '@/utils/formatters'
 import { colors, typography, radius, spacing, TRANSACTION_STATUS_COLORS } from '@/constants'
 
@@ -23,8 +24,18 @@ type StatusFilter = 'Semua' | TransactionStatus
 export default function TransactionListScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const role = useAuthStore((s) => s.user?.role ?? 'staff')
   const { invoiceGroups, loading, error, fetchTransactions, companyNames, fetchCompanyNames } =
     useTransactionStore()
+
+  useEffect(() => {
+    if (role === 'staff') {
+      router.replace('/label')
+      return
+    }
+    fetchTransactions()
+    fetchCompanyNames()
+  }, [role])
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('Semua')
@@ -33,11 +44,6 @@ export default function TransactionListScreen() {
   const [dateTo, setDateTo] = useState('')
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
-
-  useEffect(() => {
-    fetchTransactions()
-    fetchCompanyNames()
-  }, [])
 
   // Apply client-side filters (store already handles server-side date/status)
   const filteredGroups = useMemo(() => {

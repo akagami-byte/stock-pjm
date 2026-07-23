@@ -43,6 +43,7 @@ export default function CreateProductScreen() {
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [imageUri, setImageUri] = useState<string | null>(null)
+  const [typeImageUri, setTypeImageUri] = useState<string | null>(null)
 
   useEffect(() => { fetchProductTypes() }, [])
 
@@ -61,6 +62,15 @@ export default function CreateProductScreen() {
     if (!result.canceled && result.assets.length > 0) setImageUri(result.assets[0].uri)
   }
 
+  const pickTypeImage = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) { Alert.alert('Izin', 'Akses galeri diperlukan'); return }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
+    })
+    if (!result.canceled && result.assets.length > 0) setTypeImageUri(result.assets[0].uri)
+  }
+
   const handleTypeSelect = (item: { id: string; label: string }) => {
     const type = productTypes.find((t) => t.type_id === item.id)
     if (type) { setSelectedType(type); setStep('product') }
@@ -71,7 +81,18 @@ export default function CreateProductScreen() {
     if (!newTypeName.trim()) { setErrors({ typeName: 'Nama jenis wajib diisi' }); return }
     setSaving(true)
     try {
-      const newType = await createProductType({ type_code: newTypeCode.toUpperCase().trim(), type_name: newTypeName.trim() })
+      let typeImageUrl: string | undefined
+      if (typeImageUri) {
+        try {
+          const r = await uploadBarcodePresigned(typeImageUri, `type_${Date.now()}`, 'products/')
+          typeImageUrl = r.publicUrl
+        } catch { Alert.alert('Upload Gagal', 'Lanjut simpan tanpa gambar?') }
+      }
+      const newType = await createProductType({
+        type_code: newTypeCode.toUpperCase().trim(),
+        type_name: newTypeName.trim(),
+        image_url: typeImageUrl,
+      })
       setSelectedType(newType); setStep('product')
     } catch (e: any) { Alert.alert('Gagal', e?.message ?? 'Gagal') }
     finally { setSaving(false) }
@@ -132,6 +153,17 @@ export default function CreateProductScreen() {
                 <Input label="Kode Jenis (max 3 huruf)" value={newTypeCode} onChangeText={setNewTypeCode} placeholder="HGP" autoCapitalize="characters" maxLength={3} />
                 <View style={{ height: 8 }} />
                 <Input label="Nama Jenis" value={newTypeName} onChangeText={setNewTypeName} placeholder="Hollow Gate Pillar" />
+                <View style={{ height: 8 }} />
+                <Text style={{ fontSize: 13, fontWeight: '500', color: colors.body, marginBottom: 4 }}>Gambar Jenis Produk (opsional)</Text>
+                <TouchableOpacity style={styles.uploadBox} onPress={pickTypeImage}>
+                  {typeImageUri ? (
+                    <Image source={{ uri: typeImageUri }} style={styles.preview} />
+                  ) : (
+                    <View style={styles.uploadPlaceholder}>
+                      <Text style={styles.uploadText}>Ketuk untuk pilih gambar</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
                 <View style={{ height: 12 }} />
                 <Button title="Buat & Lanjut" onPress={handleCreateType} fullWidth loading={saving} />
               </>
