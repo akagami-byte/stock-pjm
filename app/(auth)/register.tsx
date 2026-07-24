@@ -20,6 +20,14 @@ import { Icon } from '@/components/ui/Icon'
 import Svg, { Path } from 'react-native-svg'
 import { LOGO_S3_URL } from './welcome'
 
+// Import Supabase & Auth Session untuk Google OAuth
+import * as WebBrowser from 'expo-web-browser'
+import { makeRedirectUri } from 'expo-auth-session'
+import { supabase } from '@/lib/supabase' // <-- Sesuaikan path ini dengan path di authStore.ts lu!
+
+// Wajib ditaruh di luar komponen agar browser native otomatis tutup setelah login
+WebBrowser.maybeCompleteAuthSession()
+
 // Custom high-fidelity Google Icon SVG
 const GoogleIcon = () => (
   <Svg width={18} height={18} viewBox="0 0 24 24" style={styles.socialIcon}>
@@ -55,6 +63,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
+  const [isSocialLoading, setIsSocialLoading] = useState(false)
 
   // Validation checks: email is valid format & password is at least 8 characters
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
@@ -76,11 +85,47 @@ export default function RegisterScreen() {
     }
   }
 
-  const handleSocialRegister = (provider: string) => {
-    Alert.alert(
-      'Informasi',
-     `Fitur masuk dengan ${provider} akan segera hadir.`
-    )
+  const handleSocialRegister = async (provider: string) => {
+    if (provider !== 'Google') {
+      Alert.alert('Informasi', `Fitur masuk dengan ${provider} akan segera hadir.`)
+      return
+    }
+
+    try {
+      setIsSocialLoading(true)
+
+      // Membuat URI callback dinamis (kompatibel untuk Expo Go maupun production)
+      const callbackUrl = makeRedirectUri({
+        scheme: 'pjmstock',
+        path: 'auth-callback',
+      })
+
+      console.log('🔗 OAuth Callback URL:', callbackUrl)
+
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: callbackUrl,
+          skipBrowserRedirect: true, // Wajib true di React Native / Expo
+        },
+      })
+
+      if (oauthError) throw oauthError
+
+      if (data?.url) {
+        // Buka browser native di HP
+        const result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl)
+
+        if (result.type === 'success' && result.url) {
+          router.replace('/(tabs)')
+        }
+      }
+    } catch (err: any) {
+      console.error('❌ Google Register Error:', err)
+      Alert.alert('Gagal Daftar Google', err.message || 'Terjadi kesalahan saat pendaftaran dengan Google.')
+    } finally {
+      setIsSocialLoading(false)
+    }
   }
 
   return (
@@ -149,7 +194,7 @@ export default function RegisterScreen() {
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
-                editable={!loading}
+                editable={!loading && !isSocialLoading}
               />
             </View>
 
@@ -168,7 +213,7 @@ export default function RegisterScreen() {
                   }}
                   secureTextEntry={!isPasswordVisible}
                   autoComplete="password-new"
-                  editable={!loading}
+                  editable={!loading && !isSocialLoading}
                 />
                 <Pressable
                   style={styles.eyeBtn}
@@ -193,7 +238,7 @@ export default function RegisterScreen() {
                 pressed && isFormValid && styles.submitButtonPressed,
               ]}
               onPress={handleRegister}
-              disabled={!isFormValid || loading}
+              disabled={!isFormValid || loading || isSocialLoading}
             >
               {loading ? (
                 <ActivityIndicator color="#0D2E16" size="small" />
@@ -225,14 +270,22 @@ export default function RegisterScreen() {
             <Pressable
               style={({ pressed }) => [styles.socialButton, pressed && styles.socialButtonPressed]}
               onPress={() => handleSocialRegister('Google')}
+              disabled={loading || isSocialLoading}
             >
-              <GoogleIcon />
-              <Text style={styles.socialButtonText}>Sign up with Google</Text>
+              {isSocialLoading ? (
+                <ActivityIndicator color="#0F1E36" size="small" />
+              ) : (
+                <>
+                  <GoogleIcon />
+                  <Text style={styles.socialButtonText}>Sign up with Google</Text>
+                </>
+              )}
             </Pressable>
 
             <Pressable
               style={({ pressed }) => [styles.socialButton, pressed && styles.socialButtonPressed]}
               onPress={() => handleSocialRegister('Apple')}
+              disabled={loading || isSocialLoading}
             >
               <AppleIcon />
               <Text style={styles.socialButtonText}>Sign up with Apple</Text>
@@ -242,7 +295,7 @@ export default function RegisterScreen() {
           {/* Footer Redirection */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>Already have an account? </Text>
-            <Pressable onPress={() => router.push('/(auth)/login')}>
+            <Pressable onPress={() => router.push('/(auth)/login')} disabled={loading || isSocialLoading}>
               <Text style={styles.footerLink}>Log in</Text>
             </Pressable>
           </View>
@@ -357,10 +410,10 @@ const styles = StyleSheet.create({
     height: 54,
   },
   submitButtonDisabled: {
-    backgroundColor: '#F1F5F9', // Screen 2: gray style
+    backgroundColor: '#F1F5F9',
   },
   submitButtonActive: {
-    backgroundColor: '#A3E635', // Screen 3: lime style
+    backgroundColor: '#A3E635',
     shadowColor: '#A3E635',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -411,6 +464,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: radius.lg,
     paddingVertical: 14,
+    height: 52,
   },
   socialButtonPressed: {
     backgroundColor: '#F8FAFC',
@@ -439,6 +493,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: typography.font.sansSemiBold,
     fontWeight: '600',
-    color: '#3b82f6', // Premium blue link
+    color: '#3b82f6',
   },
 })

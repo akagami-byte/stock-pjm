@@ -1,9 +1,20 @@
 import { create } from 'zustand'
-import type { BatchStore, StockBatchWithDetails, CreateBatchInput, CreateBatchResponse, UpdateBatchStatusInput, BatchFilterParams } from '@/types'
+import type { BatchStore, StockBatchWithDetails, CreateBatchInput, CreateBatchResponse, UpdateBatchStatusInput, BatchFilterParams, BatchStatus } from '@/types'
 import { getQuery, rpc, getAuthUser } from '@/lib/dataRouter'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { canTransitionStatus } from '@/constants'
+
+export function calculateNextStatus(
+  currentQty: number,
+  initialQty: number,
+  currentStatus: BatchStatus
+): BatchStatus {
+  if (currentQty <= 0) return 'SOLD_OUT'
+  if (currentQty < initialQty && currentQty > 0) return 'PARTIALLY_SOLD'
+  if (currentQty === initialQty && currentStatus === 'RESERVED') return 'AVAILABLE'
+  return currentStatus
+}
 
 /**
  * Batch / Label store – manages batch creation, lookup, and status updates.

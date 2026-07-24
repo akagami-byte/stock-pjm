@@ -19,6 +19,16 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
   // ─── Schema mirror (matches Supabase) ───────────────────────────────
   await db.execAsync(`
+
+    CREATE TABLE IF NOT EXISTS local_users(
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL.
+      password TEXT NOT NULL,
+      full_name TEXT,
+      role TEXT DEEFAULT 'staff',
+      created_at TEXT DEFAULT (datetime('now'))    
+    );
+
     CREATE TABLE IF NOT EXISTS product_types (
       type_id TEXT PRIMARY KEY,
       type_code TEXT NOT NULL UNIQUE,

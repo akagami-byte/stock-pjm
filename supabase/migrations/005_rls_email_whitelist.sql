@@ -12,6 +12,7 @@ BEGIN
     'rehanforic@gmail.com',
     'handivanda@protonmail.com',
     'hanvankernel@gmail.com'
+    
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

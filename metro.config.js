@@ -9,4 +9,6 @@ config.resolver.extraNodeModules = {
   buffer: require.resolve('buffer/'),
 }
 
+config.resolver.assetExts.push('wasm');
+
 module.exports = config
