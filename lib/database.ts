@@ -22,7 +22,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE TABLE IF NOT EXISTS local_users(
       id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL.
+      email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       full_name TEXT,
       role TEXT DEEFAULT 'staff',

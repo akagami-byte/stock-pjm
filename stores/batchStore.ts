@@ -4,6 +4,7 @@ import { getQuery, rpc, getAuthUser } from '@/lib/dataRouter'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { canTransitionStatus } from '@/constants'
+import { getDatabase } from '@/lib/database'
 
 export function calculateNextStatus(
   currentQty: number,
@@ -14,6 +15,145 @@ export function calculateNextStatus(
   if (currentQty < initialQty && currentQty > 0) return 'PARTIALLY_SOLD'
   if (currentQty === initialQty && currentStatus === 'RESERVED') return 'AVAILABLE'
   return currentStatus
+}
+
+interface LocalBatchFilterParams extends BatchFilterParams {
+  batch_id?: string;
+  batch_code?: string;
+}
+
+/**
+ * Helper untuk mengambil data batch di SQLite Lokal dengan LEFT JOIN standar.
+ * Menggantikan method .in(), .ilike(), dan relational string Supabase.
+ */
+async function fetchLocalBatchesWithJoin(filters?: LocalBatchFilterParams): Promise<{ batches: StockBatchWithDetails[], totalCount: number }> {
+  const db = await getDatabase();
+
+  let sql = `
+    SELECT 
+      sb.*,
+      pv.variant_id AS pv_variant_id,
+      pv.sku_full AS pv_sku_full,
+      pv.finishing AS pv_finishing,
+      pv.price_modifier AS pv_price_modifier,
+      p.product_id AS p_product_id,
+      p.product_name AS p_product_name,
+      p.version AS p_version,
+      p.base_price AS p_base_price,
+      pt.type_id AS pt_type_id,
+      pt.type_name AS pt_type_name,
+      pt.type_code AS pt_type_code
+    FROM stock_batch sb
+    LEFT JOIN product_variants pv ON sb.variant_id = pv.variant_id
+    LEFT JOIN products p ON pv.product_id = p.product_id
+    LEFT JOIN product_types pt ON p.type_id = pt.type_id
+    WHERE sb.deleted_at IS NULL
+  `;
+
+  const params: any[] = [];
+
+  // Pengganti method .in() dan .eq() untuk status
+  if (filters?.status && (filters.status as any) !== 'ALL') {
+    if (Array.isArray(filters.status)) {
+      if (filters.status.length > 0) {
+        const placeholders = filters.status.map(() => '?').join(', ');
+        sql += ` AND sb.status IN (${placeholders})`;
+        params.push(...filters.status);
+      }
+    } else {
+      sql += ` AND sb.status = ?`;
+      params.push(filters.status as string);
+    }
+  }
+
+  // Pengganti method .ilike() untuk search batch_code
+  if (filters?.search) {
+    sql += ` AND sb.batch_code LIKE ?`;
+    params.push(`%${filters.search}%`);
+  }
+
+  if (filters?.variant_id) {
+    sql += ` AND sb.variant_id = ?`;
+    params.push(filters.variant_id);
+  }
+
+  if (filters?.batch_id) {
+    sql += ` AND sb.batch_id = ?`;
+    params.push(filters.batch_id);
+  }
+
+  if (filters?.batch_code) {
+    sql += ` AND sb.batch_code = ?`;
+    params.push(filters.batch_code);
+  }
+
+  sql += ` ORDER BY sb.entry_date DESC`;
+
+  // Pengganti method .range() / .limit() untuk pagination
+  if (filters?.limit) {
+    sql += ` LIMIT ?`;
+    params.push(filters.limit);
+    if (filters?.offset) {
+      sql += ` OFFSET ?`;
+      params.push(filters.offset);
+    }
+  }
+
+  const rawData = await db.getAllAsync<any>(sql, params);
+
+  // Mapping hasil FLAT SQL ke NESTED OBJECT agar UI Stok & Label tidak crash
+  const batches = rawData.map(row => ({
+    ...row,
+    status: row.status,
+    variant: row.pv_variant_id ? {
+      variant_id: row.pv_variant_id,
+      sku_full: row.pv_sku_full,
+      finishing: row.pv_finishing,
+      price_modifier: row.pv_price_modifier,
+      product: row.p_product_id ? {
+        product_id: row.p_product_id,
+        product_name: row.p_product_name,
+        version: row.p_version,
+        base_price: row.p_base_price,
+        type: {
+          type_id: row.pt_type_id,
+          type_name: row.pt_type_name || '',
+          type_code: row.pt_type_code || ''
+        }
+      } : null
+    } : null,
+    sales_transaction: [] // Array kosong aman sebagai fallback
+  })) as StockBatchWithDetails[];
+
+  // Hitung totalCount untuk pagination di lokal
+  let countSql = `SELECT COUNT(*) as cnt FROM stock_batch sb WHERE sb.deleted_at IS NULL`;
+  const countParams: any[] = [];
+  
+  if (filters?.status && (filters.status as any) !== 'ALL') {
+    if (Array.isArray(filters.status)) {
+      if (filters.status.length > 0) {
+        const placeholders = filters.status.map(() => '?').join(', ');
+        countSql += ` AND sb.status IN (${placeholders})`;
+        countParams.push(...filters.status);
+      }
+    } else {
+      countSql += ` AND sb.status = ?`;
+      countParams.push(filters.status as string);
+    }
+  }
+  if (filters?.search) {
+    countSql += ` AND sb.batch_code LIKE ?`;
+    countParams.push(`%${filters.search}%`);
+  }
+  if (filters?.variant_id) {
+    countSql += ` AND sb.variant_id = ?`;
+    countParams.push(filters.variant_id);
+  }
+
+  const countResult = await db.getFirstAsync<{ cnt: number }>(countSql, countParams);
+  const totalCount = countResult?.cnt ?? batches.length;
+
+  return { batches, totalCount };
 }
 
 /**
@@ -33,7 +173,6 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
   _realtimeChannel: null as any,
 
   subscribeToRealtime: () => {
-    // Basic user: no realtime
     if (!useAuthStore.getState().user?.is_premium) return
 
     const existing = (get() as any)._realtimeChannel
@@ -106,39 +245,48 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
   fetchBatches: async (filters?: BatchFilterParams) => {
     set({ loading: true, error: null })
     try {
-      let query = getQuery('stock_batch')
-        .select('*, variant:product_variants(*, product:products(*, type:product_types(*))), sales_transaction:sales_transaction(company_name, status)', { count: 'exact' })
-        .is('deleted_at', null)
-        .order('entry_date', { ascending: false })
+      const isPremium = useAuthStore.getState().user?.is_premium;
 
-      if (filters?.status && (filters.status as any) !== 'ALL') {
-        if (Array.isArray(filters.status)) {
-          query = query.in('status', filters.status)
-        } else {
-          query = query.eq('status', filters.status as string)
+      if (isPremium) {
+        // --- 1. JALUR SUPABASE CLOUD (PREMIUM) ---
+        let query = getQuery('stock_batch')
+          .select('*, variant:product_variants(*, product:products(*, type:product_types(*))), sales_transaction:sales_transaction(company_name, status)', { count: 'exact' })
+          .is('deleted_at', null)
+          .order('entry_date', { ascending: false })
+
+        if (filters?.status && (filters.status as any) !== 'ALL') {
+          if (Array.isArray(filters.status)) {
+            query = query.in('status', filters.status)
+          } else {
+            query = query.eq('status', filters.status as string)
+          }
         }
+
+        if (filters?.search) {
+          query = query.ilike('batch_code', `%${filters.search}%`)
+        }
+
+        if (filters?.variant_id) {
+          query = query.eq('variant_id', filters.variant_id)
+        }
+
+        if (filters?.limit) {
+          query = query.limit(filters.limit)
+        }
+
+        if (filters?.offset) {
+          query = query.range(filters.offset, filters.offset + (filters.limit ?? 50) - 1)
+        }
+
+        const { data, error, count } = await query
+
+        if (error) throw error
+        set({ batches: (data as unknown as StockBatchWithDetails[]) ?? [], totalCount: count ?? 0, loading: false })
+      } else {
+        // --- 2. JALUR SQLITE LOKAL (NON-PREMIUM) ---
+        const { batches, totalCount } = await fetchLocalBatchesWithJoin(filters);
+        set({ batches, totalCount, loading: false });
       }
-
-      if (filters?.search) {
-        query = query.ilike('batch_code', `%${filters.search}%`)
-      }
-
-      if (filters?.variant_id) {
-        query = query.eq('variant_id', filters.variant_id)
-      }
-
-      if (filters?.limit) {
-        query = query.limit(filters.limit)
-      }
-
-      if (filters?.offset) {
-        query = query.range(filters.offset, filters.offset + (filters.limit ?? 50) - 1)
-      }
-
-      const { data, error, count } = await query
-
-      if (error) throw error
-      set({ batches: (data as unknown as StockBatchWithDetails[]) ?? [], totalCount: count ?? 0, loading: false })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal memuat batch'
       set({ error: message, loading: false })
@@ -174,16 +322,25 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
 
   fetchBatchById: async (batchId: string) => {
     try {
-      const { data, error } = await getQuery('stock_batch')
-        .select('*, variant:product_variants(*, product:products(*, type:product_types(*)))')
-        .eq('batch_id', batchId)
-        .single()
+      const isPremium = useAuthStore.getState().user?.is_premium;
 
-      if (error) throw error
+      if (isPremium) {
+        const { data, error } = await getQuery('stock_batch')
+          .select('*, variant:product_variants(*, product:products(*, type:product_types(*)))')
+          .eq('batch_id', batchId)
+          .single()
 
-      const batch = data as unknown as StockBatchWithDetails
-      set({ selectedBatch: batch })
-      return batch
+        if (error) throw error
+        const batch = data as unknown as StockBatchWithDetails
+        set({ selectedBatch: batch })
+        return batch
+      } else {
+        const { batches } = await fetchLocalBatchesWithJoin({ batch_id: batchId });
+        if (!batches || batches.length === 0) throw new Error('Batch tidak ditemukan');
+        const batch = batches[0];
+        set({ selectedBatch: batch });
+        return batch;
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Batch tidak ditemukan'
       set({ error: message })
@@ -197,13 +354,20 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
       const actualBatchCode = parts ? parts.pop()! : batchCode
       const skuPrefix = parts ? parts.join('-') : null
 
-      let query = getQuery('stock_batch')
-        .select('*, variant:product_variants(*, product:products(*, type:product_types(*)))')
-        .eq('batch_code', actualBatchCode)
+      const isPremium = useAuthStore.getState().user?.is_premium;
+      let data: any[] = [];
 
-      const { data, error } = await query
+      if (isPremium) {
+        const res = await getQuery('stock_batch')
+          .select('*, variant:product_variants(*, product:products(*, type:product_types(*)))')
+          .eq('batch_code', actualBatchCode);
+        if (res.error) throw res.error;
+        data = res.data ?? [];
+      } else {
+        const res = await fetchLocalBatchesWithJoin({ batch_code: actualBatchCode });
+        data = res.batches;
+      }
 
-      if (error) throw error
       if (!data || data.length === 0) return null
 
       if (skuPrefix) {

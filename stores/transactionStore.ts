@@ -1,10 +1,106 @@
 import { create } from 'zustand'
 import type { TransactionStore, SalesTransactionWithDetails, InvoiceGroup, CreateTransactionInput, TransactionFilterParams } from '@/types'
 import { getQuery, getAuthUser } from '@/lib/dataRouter'
+import { useAuthStore } from '@/stores/authStore'
+import { getDatabase } from '@/lib/database'
+
+/**
+ * Helper untuk mengambil data transaksi di SQLite Lokal dengan LEFT JOIN
+ * dan mengubah datanya kembali ke format Nested Object agar UI tidak error.
+ */
+async function fetchLocalTransactionsWithJoin(filters?: TransactionFilterParams): Promise<SalesTransactionWithDetails[]> {
+  const db = await getDatabase();
+  
+  // Query SQL dengan penempatan alias kolom yang 100% sesuai skema lokal
+  let sql = `
+    SELECT 
+      t.*,
+      sb.batch_id AS sb_batch_id,
+      sb.batch_code AS sb_batch_code,
+      sb.initial_qty AS sb_initial_qty,
+      sb.current_qty AS sb_current_qty,
+      sb.status AS sb_status,
+      pv.variant_id AS pv_variant_id,
+      pv.sku_full AS pv_sku_full,
+      pv.finishing AS pv_finishing,
+      pv.price_modifier AS pv_price_modifier,
+      p.product_id AS p_product_id,
+      p.product_name AS p_product_name,
+      p.version AS p_version,
+      p.base_price AS p_base_price,
+      pt.type_name AS pt_type_name,
+      pt.type_code AS pt_type_code
+    FROM sales_transaction t
+    LEFT JOIN stock_batch sb ON t.batch_id = sb.batch_id
+    LEFT JOIN product_variants pv ON sb.variant_id = pv.variant_id
+    LEFT JOIN products p ON pv.product_id = p.product_id
+    LEFT JOIN product_types pt ON p.type_id = pt.type_id
+    WHERE 1=1
+  `;
+
+  const params: any[] = [];
+
+  if (filters?.status) {
+    sql += ` AND t.status = ?`;
+    params.push(filters.status);
+  }
+  if (filters?.company_name) {
+    sql += ` AND t.company_name LIKE ?`;
+    params.push(`%${filters.company_name}%`);
+  }
+  if (filters?.date_from) {
+    sql += ` AND t.transaction_date >= ?`;
+    params.push(filters.date_from);
+  }
+  if (filters?.date_to) {
+    sql += ` AND t.transaction_date <= ?`;
+    params.push(filters.date_to);
+  }
+
+  sql += ` ORDER BY t.transaction_date DESC`;
+
+  if (filters?.limit) {
+    sql += ` LIMIT ?`;
+    params.push(filters.limit);
+  }
+
+  const rawData = await db.getAllAsync<any>(sql, params);
+
+  // Mapping hasil JOIN SQL ke dalam bentuk Nested Object asli
+  return rawData.map(row => ({
+    ...row,
+    status: row.status,
+    batch: row.sb_batch_id ? {
+      batch_id: row.sb_batch_id,
+      batch_code: row.sb_batch_code,
+      initial_qty: row.sb_initial_qty,
+      current_qty: row.sb_current_qty,
+      status: row.sb_status,
+      variant: row.pv_variant_id ? {
+        variant_id: row.pv_variant_id,
+        sku_full: row.pv_sku_full,
+        finishing: row.pv_finishing,        // <-- Ambil asli dari product_variants
+        version: row.p_version,             // <-- Ambil asli dari products
+        base_price: row.p_base_price,       // <-- Ambil asli dari products
+        price_modifier: row.pv_price_modifier,
+        product: row.p_product_id ? {
+          product_id: row.p_product_id,
+          product_name: row.p_product_name,
+          version: row.p_version,           // <-- Dipetakan juga ke object product
+          base_price: row.p_base_price,     // <-- Dipetakan juga ke object product
+          type: { 
+            type_name: row.pt_type_name || '',
+            type_code: row.pt_type_code || '' 
+          }
+        } : null
+      } : null
+    } : null
+  })) as SalesTransactionWithDetails[];
+}
 
 /**
  * Transaction store – manages sales transactions and company auto-suggest.
- * Routes to Supabase (premium) or SQLite (basic) via dataRouter.
+ * Hybrid: Supabase (premium) vs SQLite (non-premium/basic).
  */
 export const useTransactionStore = create<TransactionStore>((set, get) => ({
   // ─── State ──────────────────────────────────────────────
@@ -19,23 +115,30 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   fetchTransactions: async (filters?: TransactionFilterParams) => {
     set({ loading: true, error: null })
     try {
-      let query = getQuery('sales_transaction')
-        .select('*, batch:stock_batch(*, variant:product_variants(*, product:products(*, type:product_types(*))))')
-        .order('transaction_date', { ascending: false })
+      const isPremium = useAuthStore.getState().user?.is_premium;
+      let transactions: SalesTransactionWithDetails[] = [];
 
-      if (filters?.status) query = query.eq('status', filters.status)
-      if (filters?.company_name) query = query.ilike('company_name', `%${filters.company_name}%`)
-      if (filters?.date_from) query = query.gte('transaction_date', filters.date_from)
-      if (filters?.date_to) query = query.lte('transaction_date', filters.date_to)
-      if (filters?.limit) query = query.limit(filters.limit)
+      if (isPremium) {
+        // --- 1. JALUR SUPABASE CLOUD (PREMIUM USER) ---
+        let query = getQuery('sales_transaction')
+          .select('*, batch:stock_batch(*, variant:product_variants(*, product:products(*, type:product_types(*))))')
+          .order('transaction_date', { ascending: false })
 
-      const { data, error } = await query
+        if (filters?.status) query = query.eq('status', filters.status)
+        if (filters?.company_name) query = query.ilike('company_name', `%${filters.company_name}%`)
+        if (filters?.date_from) query = query.gte('transaction_date', filters.date_from)
+        if (filters?.date_to) query = query.lte('transaction_date', filters.date_to)
+        if (filters?.limit) query = query.limit(filters.limit)
 
-      if (error) throw error
+        const { data, error } = await query
+        if (error) throw error
+        transactions = (data as unknown as SalesTransactionWithDetails[]) ?? []
+      } else {
+        // --- 2. JALUR SQLITE LOKAL (NON-PREMIUM USER) ---
+        transactions = await fetchLocalTransactionsWithJoin(filters);
+      }
 
-      const transactions = (data as unknown as SalesTransactionWithDetails[]) ?? []
       const groups = groupByInvoice(transactions)
-
       set({ transactions, invoiceGroups: groups, loading: false })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal memuat transaksi'
@@ -61,13 +164,11 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
         notes: input.notes ?? null,
       }))
 
-      const { error } = await getQuery('sales_transaction')
-        .insert(rows)
-
+      // getQuery insert aman di kedua mode karena berupa CRUD sederhana (tanpa join select)
+      const { error } = await getQuery('sales_transaction').insert(rows)
       if (error) throw error
 
       await get().fetchTransactions()
-
       set({ loading: false })
       return invoiceNumber
     } catch (error) {
@@ -85,7 +186,6 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
         .eq('sales_id', salesId)
 
       if (error) throw error
-
       await get().fetchTransactions()
       set({ loading: false })
     } catch (error) {
@@ -103,7 +203,6 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
         .eq('sales_id', salesId)
 
       if (error) throw error
-
       await get().fetchTransactions()
       set({ loading: false })
     } catch (error) {
@@ -115,21 +214,34 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
 
   fetchCompanyNames: async (query?: string) => {
     try {
-      let q = getQuery('sales_transaction')
-        .select('company_name')
-        .order('company_name', { ascending: true })
+      const isPremium = useAuthStore.getState().user?.is_premium;
+      let names: string[] = [];
 
-      if (query) {
-        q = q.ilike('company_name', `%${query}%`)
+      if (isPremium) {
+        let q = getQuery('sales_transaction')
+          .select('company_name')
+          .order('company_name', { ascending: true })
+
+        if (query) q = q.ilike('company_name', `%${query}%`)
+        const { data, error } = await q
+        if (error) throw error
+        names = [...new Set((data ?? []).map((d: any) => d.company_name))] as string[];
+      } else {
+        // Mode SQLite: Gunakan LIKE murni karena SQLite tidak mendukung syntax .ilike() Supabase
+        const db = await getDatabase();
+        let sql = `SELECT DISTINCT company_name FROM sales_transaction WHERE company_name IS NOT NULL`;
+        const params: any[] = [];
+        if (query) {
+          sql += ` AND company_name LIKE ?`;
+          params.push(`%${query}%`);
+        }
+        sql += ` ORDER BY company_name ASC`;
+        const data = await db.getAllAsync<{ company_name: string }>(sql, params);
+        names = data.map(d => d.company_name);
       }
 
-      const { data, error } = await q
-
-      if (error) throw error
-
-      const names = [...new Set((data ?? []).map((d: any) => d.company_name))]
-      set({ companyNames: names as string[] })
-      return names as string[]
+      set({ companyNames: names })
+      return names
     } catch (error) {
       return []
     }
