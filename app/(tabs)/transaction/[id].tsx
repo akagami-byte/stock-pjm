@@ -13,8 +13,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { useTransactionStore } from '@/stores/transactionStore'
+import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatCurrency } from '@/utils/formatters'
-import { colors, typography, radius, spacing, TRANSACTION_STATUS_COLORS } from '@/constants'
+import { colors, typography, radius, spacing, getTransactionStatusConfig } from '@/constants'
 import type { InvoiceGroup } from '@/types'
 
 export default function TransactionDetailScreen() {
@@ -22,6 +23,7 @@ export default function TransactionDetailScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const transactionStore = useTransactionStore()
+  const role = useAuthStore((s) => s.user?.role ?? 'owner')
   const { invoiceGroups, loading } = transactionStore
 
   const [group, setGroup] = useState<InvoiceGroup | null>(null)
@@ -47,12 +49,56 @@ export default function TransactionDetailScreen() {
     )
   }
 
-  const statusColor = TRANSACTION_STATUS_COLORS[group.status] ?? {
-    background: '#6B7280',
-    text: '#FFFFFF',
-    label: group.status,
-  }
+  const statusColor = getTransactionStatusConfig(group.status, role)
+  const isOwner = role === 'owner'
   const isCompleted = group.status === 'COMPLETED'
+  const isAccepted = group.status === 'ACCEPTED'
+  const isPendingApproval = group.status === 'PENDING_APPROVAL'
+  // Owner bisa cancel/retur transaksi final (COMPLETED atau ACCEPTED)
+  const canCancelReturn = isOwner && (isCompleted || isAccepted)
+
+  const handleApprove = () => {
+    Alert.alert(
+      'Terima Transaksi',
+      `Invoice ${group.invoice_number} akan disetujui.\n\n⚠️ Stok akan dikurangi.`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Terima',
+          onPress: async () => {
+            try {
+              await transactionStore.approveInvoiceGroup(group.invoice_number)
+              Alert.alert('Berhasil', 'Transaksi disetujui. Stok telah dikurangi.')
+            } catch (err: any) {
+              Alert.alert('Error', err.message)
+            }
+          },
+        },
+      ]
+    )
+  }
+
+  const handleReject = () => {
+    Alert.alert(
+      'Tolak Transaksi',
+      `Invoice ${group.invoice_number} akan ditolak.\n\nStok tidak berubah.`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Tolak',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await transactionStore.rejectInvoiceGroup(group.invoice_number)
+              Alert.alert('Berhasil', 'Transaksi ditolak.')
+            } catch (err: any) {
+              Alert.alert('Error', err.message)
+            }
+          },
+        },
+      ]
+    )
+  }
 
   const handleCetakInvoice = () => {
     // TODO: implement PDF invoice generation
@@ -60,8 +106,8 @@ export default function TransactionDetailScreen() {
   }
 
   const handleCancel = () => {
-    if (!isCompleted) {
-      Alert.alert('Info', 'Hanya transaksi COMPLETED yang dapat dibatalkan.')
+    if (!canCancelReturn) {
+      Alert.alert('Info', 'Hanya transaksi final (COMPLETED/ACCEPTED) yang dapat dibatalkan oleh Owner.')
       return
     }
     const firstItem = group.items[0]
@@ -88,8 +134,8 @@ export default function TransactionDetailScreen() {
   }
 
   const handleReturn = () => {
-    if (!isCompleted) {
-      Alert.alert('Info', 'Hanya transaksi COMPLETED yang dapat diretur.')
+    if (!canCancelReturn) {
+      Alert.alert('Info', 'Hanya transaksi final (COMPLETED/ACCEPTED) yang dapat diretur oleh Owner.')
       return
     }
     const firstItem = group.items[0]
@@ -238,29 +284,73 @@ export default function TransactionDetailScreen() {
         </View>
       </Card>
 
-      {/* Actions — always visible */}
-      <View style={styles.actions}>
-        <Button
-          title="📄 Cetak Invoice"
-          variant="primary"
-          fullWidth
-          onPress={handleCetakInvoice}
-        />
-        <Button
-          title="❌ Batalkan"
-          variant={isCompleted ? 'danger' : 'secondary'}
-          fullWidth
-          onPress={handleCancel}
-          disabled={!isCompleted}
-        />
-        <Button
-          title="🔄 Retur"
-          variant={isCompleted ? 'danger' : 'secondary'}
-          fullWidth
-          onPress={handleReturn}
-          disabled={!isCompleted}
-        />
-      </View>
+      {/* Status info per role */}
+      {role === 'admin' && isPendingApproval && (
+        <Card style={{ borderColor: colors.warning, borderWidth: 1 }}>
+          <Text style={styles.sectionTitle}>⏳ Menunggu Approval</Text>
+          <Text style={styles.notesText}>
+            Transaksi ini menunggu persetujuan Owner. Stok belum berkurang.
+          </Text>
+        </Card>
+      )}
+      {role === 'admin' && isCompleted && (
+        <Card style={{ borderColor: colors.muted, borderWidth: 1 }}>
+          <Text style={styles.sectionTitle}>🔒 Read-Only</Text>
+          <Text style={styles.notesText}>
+            Transaksi dibuat langsung oleh Owner. Hanya Owner yang dapat membatalkan atau meretur.
+          </Text>
+        </Card>
+      )}
+
+      {/* Approval actions — khusus Owner untuk transaksi PENDING_APPROVAL */}
+      {isOwner && isPendingApproval && (
+        <Card style={{ borderColor: colors.warning, borderWidth: 1 }}>
+          <Text style={styles.sectionTitle}>⏳ Butuh Approval</Text>
+          <Text style={styles.notesText}>
+            Transaksi diajukan oleh Admin. Stok belum dikurangi sampai disetujui.
+          </Text>
+          <View style={styles.actions}>
+            <Button
+              title="✅ Terima (Setujui & Kurangi Stok)"
+              variant="primary"
+              fullWidth
+              onPress={handleApprove}
+            />
+            <Button
+              title="❌ Tolak"
+              variant="danger"
+              fullWidth
+              onPress={handleReject}
+            />
+          </View>
+        </Card>
+      )}
+
+      {/* Actions — Owner untuk transaksi final; Admin read-only */}
+      {isOwner && (
+        <View style={styles.actions}>
+          <Button
+            title="📄 Cetak Invoice"
+            variant="primary"
+            fullWidth
+            onPress={handleCetakInvoice}
+          />
+          <Button
+            title="❌ Batalkan"
+            variant={canCancelReturn ? 'danger' : 'secondary'}
+            fullWidth
+            onPress={handleCancel}
+            disabled={!canCancelReturn}
+          />
+          <Button
+            title="🔄 Retur"
+            variant={canCancelReturn ? 'danger' : 'secondary'}
+            fullWidth
+            onPress={handleReturn}
+            disabled={!canCancelReturn}
+          />
+        </View>
+      )}
 
       <View style={{ height: 40 }} />
     </ScrollView>

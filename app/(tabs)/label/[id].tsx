@@ -18,6 +18,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import BarcodeVisual from '@/components/ui/BarcodeVisual'
 import { useBatchStore } from '@/stores/batchStore'
+import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatCurrency } from '@/utils/formatters'
 import { getStatusColor, getTransitionRequirements, getAllowedTransitions, getFinishingLabel, canTransitionStatus, colors } from '@/constants'
 import { generateLabelHtml, calculateLabelLayout, PAPER_SIZES, LABEL_SIZES, type BatchLabelItem } from '@/utils/labelPrinter'
@@ -29,6 +30,9 @@ export default function LabelDetailScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const batchStore = useBatchStore()
+
+  const role = useAuthStore((s) => s.user?.role ?? 'staff')
+  const isOwner = role === 'owner'
 
   const [batch, setBatch] = useState<StockBatchWithDetails | null>(null)
   const [loading, setLoading] = useState(true)
@@ -72,7 +76,7 @@ export default function LabelDetailScreen() {
 
   const handleDelete = () => {
     if (!batch) return
-    Alert.alert('Pindah ke Trash?', 'Batch akan dipindah ke trash dan bisa direstore dalam 30 hari.', [
+    Alert.alert('Pindah ke Sampah?', 'Batch akan dipindah ke Sampah dan bisa direstore dalam 30 hari.', [
       { text: 'Batal', style: 'cancel' },
       {
         text: 'Pindah', style: 'destructive',
@@ -128,7 +132,7 @@ export default function LabelDetailScreen() {
       const oldStatus = batch.status
       await batchStore.updateBatchStatus(batch.batch_id, { new_status: targetStatus, company_name: companyName || undefined, note: note || undefined })
       Alert.alert('Berhasil', `Status: ${oldStatus} → ${targetStatus}`)
-      
+
       const updatedBatch = { ...batch, status: targetStatus }
       setBatch(updatedBatch)
       batchStore.setSelectedBatch(updatedBatch)
@@ -243,10 +247,12 @@ export default function LabelDetailScreen() {
           <Text style={styles.infoLabel}>Versi · Finishing</Text>
           <Text style={styles.infoValue}>{product?.version ?? '—'} · {getFinishingLabel(variant?.finishing)}</Text>
         </View>
+        {isOwner && (
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Harga Efektif</Text>
           <Text style={styles.infoValue}>{formatCurrency(effectivePrice)}</Text>
         </View>
+        )}
       </Card>
 
       {/* Stock Info */}
@@ -273,7 +279,7 @@ export default function LabelDetailScreen() {
       </Card>
 
       {/* Barcode Preview */}
-      <Card>
+      {/*<Card>
         <Text style={styles.sectionTitle}>Barcode</Text>
         <BarcodeVisual code={batch.batch_code} height={60} />
         <Text style={styles.barcodeCode}>{batch.batch_code}</Text>
@@ -282,7 +288,7 @@ export default function LabelDetailScreen() {
         ) : (
           <Text style={styles.barcodeHint}>Belum ada gambar barcode terupload</Text>
         )}
-      </Card>
+      </Card>*/}
 
       {/* Reprint */}
       <Button
@@ -339,7 +345,7 @@ export default function LabelDetailScreen() {
       )}
 
       {!isInTrash && (
-        <Button title="Pindah ke Trash" variant="danger" fullWidth onPress={handleDelete} />
+        <Button title="Pindah ke Sampah" variant="danger" fullWidth onPress={handleDelete} />
       )}
 
       <View style={{ height: 40 }} />

@@ -5,13 +5,16 @@
 BEGIN;
 
 -- ─── Helper function: check if user is premium ─────────────────────────
+-- NOTE: email admin (adminputrajayametal@gmail.com) WAJIB ada di sini,
+-- kalau tidak admin tidak bisa baca/tulis cloud.
 CREATE OR REPLACE FUNCTION is_premium_user()
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN auth.email() IN (
     'rehanforic@gmail.com',
     'handivanda@protonmail.com',
-    'hanvankernel@gmail.com'
+    'hanvankernel@gmail.com',
+    'adminputrajayametal@gmail.com'
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

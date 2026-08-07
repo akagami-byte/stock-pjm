@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { User } from '@/types'
+import { getUserRole, PREMIUM_EMAILS } from '@/stores/authStore'
 
 /**
  * Supabase Auth service – login, logout, session management.
@@ -39,7 +40,7 @@ export async function getCurrentUser(): Promise<User | null> {
     email,
     full_name: data.user.user_metadata?.full_name ?? null,
     avatar_url: data.user.user_metadata?.avatar_url ?? null,
-    is_premium: false,
-    role: 'staff' as const,
+    is_premium: PREMIUM_EMAILS.includes(email),
+    role: getUserRole(email),
   }
 }

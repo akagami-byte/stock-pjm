@@ -231,13 +231,20 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
 
       if (updateError) throw updateError
 
+      // Gabung company_name + note untuk status RESERVED
+      let logNote = input.note ?? null
+      if (input.new_status === 'RESERVED' && input.company_name) {
+        const companyTag = `[DIPESAN:${input.company_name}]`
+        logNote = logNote ? `${companyTag} ${logNote}` : companyTag
+      }
+
       const { error: logError } = await getQuery('batch_status_log')
         .insert({
           batch_id: batchId,
           old_status: batch.status,
           new_status: input.new_status,
           changed_by: userData.user?.id ?? null,
-          note: input.note ?? null,
+          note: logNote,
         })
 
       if (logError) console.warn('Failed to insert status log:', logError)

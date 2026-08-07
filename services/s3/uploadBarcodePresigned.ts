@@ -1,7 +1,21 @@
 // services/s3/uploadBarcodePresigned.ts
 import * as FileSystem from 'expo-file-system/legacy'
+import Constants from 'expo-constants'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://100.118.194.66:3050'
+/**
+ * Resolve Supabase URL — same pattern as lib/supabase.ts.
+ * Works in Expo Go, EAS builds, and production.
+ */
+function getApiBase(): string {
+  // env vars dari app.config.js extra (EAS build / production)
+  const fromExtra = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL as string | undefined
+  // Fallback ke process.env (Metro / Expo Go dev)
+  const fromEnv = fromExtra || process.env.EXPO_PUBLIC_SUPABASE_URL
+  // Fallback ke env var khusus API (bisa berbeda dari Supabase URL)
+  const apiUrl = fromEnv || process.env.EXPO_PUBLIC_API_URL
+  // Last resort: local dev fallback
+  return apiUrl || 'http://localhost:54321'
+}
 
 /** Map ekstensi file → MIME type */
 const EXT_TO_MIME: Record<string, string> = {
@@ -40,6 +54,7 @@ export async function uploadBarcodePresigned(
   batchCode: string,
   prefix: string = 'barcodes/',
 ): Promise<UploadResult> {
+  const API_BASE = getApiBase()
   const timestamp = Date.now()
   const { ext, mime: contentType } = detectContentType(localFileUri)
   const objectKey = `${prefix}${batchCode}_${timestamp}.${ext}`
@@ -63,7 +78,7 @@ export async function uploadBarcodePresigned(
 
   const { uploadUrl, publicUrl } = await presignResp.json()
 
-  // 2. Upload file ke presigned URL (harus sertakan x-amz-acl)
+  // 2. Upload file ke presigned URL
   const uploadResult = await FileSystem.uploadAsync(uploadUrl, localFileUri, {
     httpMethod: 'PUT',
     headers: { 'Content-Type': contentType, 'x-amz-acl': 'public-read' },

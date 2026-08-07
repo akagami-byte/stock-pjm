@@ -70,9 +70,9 @@ export default function WelcomeScreen() {
       {/* Content section */}
       <SafeAreaView style={styles.contentContainer} edges={['bottom']}>
         <View style={styles.textContent}>
-          <Text style={styles.title}>Leafboard</Text>
+          <Text style={styles.title}>stockaja</Text>
           <Text style={styles.subtitle}>
-            Satu platform untuk manajemen stok 
+            Satu platform untuk manajemen stok
           </Text>
         </View>
 

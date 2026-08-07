@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import type { TransactionStore, SalesTransactionWithDetails, InvoiceGroup, CreateTransactionInput, TransactionFilterParams } from '@/types'
+import type { TransactionStore, SalesTransactionWithDetails, InvoiceGroup, CreateTransactionInput, TransactionFilterParams, TransactionStatus } from '@/types'
 import { getQuery, getAuthUser } from '@/lib/dataRouter'
+import { useAuthStore } from '@/stores/authStore'
 
 /**
  * Transaction store – manages sales transactions and company auto-suggest.
@@ -47,6 +48,10 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const { data: userData } = await getAuthUser()
+      const role = useAuthStore.getState().user?.role ?? 'owner'
+      // Admin → PENDING_APPROVAL (stok belum berkurang sampai disetujui owner)
+      // Owner → COMPLETED (langsung berkurang via DB trigger)
+      const status: TransactionStatus = input.status ?? (role === 'admin' ? 'PENDING_APPROVAL' : 'COMPLETED')
       const invoiceNumber = generateInvoiceNumber()
 
       const rows = input.items.map((item) => ({
@@ -56,7 +61,7 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
         price_per_unit: item.price_per_unit,
         alt_price_id: item.alt_price_id ?? null,
         invoice_number: invoiceNumber,
-        status: 'COMPLETED' as const,
+        status,
         created_by: userData.user?.id ?? null,
         notes: input.notes ?? null,
       }))
@@ -72,6 +77,46 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
       return invoiceNumber
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal membuat transaksi'
+      set({ error: message, loading: false })
+      throw error
+    }
+  },
+
+  approveInvoiceGroup: async (invoiceNumber: string) => {
+    set({ loading: true, error: null })
+    try {
+      // Status → ACCEPTED; stok dikurangi otomatis oleh DB trigger (migration 008)
+      const { error } = await getQuery('sales_transaction')
+        .update({ status: 'ACCEPTED' })
+        .eq('invoice_number', invoiceNumber)
+        .eq('status', 'PENDING_APPROVAL')
+
+      if (error) throw error
+
+      await get().fetchTransactions()
+      set({ loading: false })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal menyetujui transaksi'
+      set({ error: message, loading: false })
+      throw error
+    }
+  },
+
+  rejectInvoiceGroup: async (invoiceNumber: string) => {
+    set({ loading: true, error: null })
+    try {
+      // Status → REJECTED; stok tetap aman
+      const { error } = await getQuery('sales_transaction')
+        .update({ status: 'REJECTED' })
+        .eq('invoice_number', invoiceNumber)
+        .eq('status', 'PENDING_APPROVAL')
+
+      if (error) throw error
+
+      await get().fetchTransactions()
+      set({ loading: false })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal menolak transaksi'
       set({ error: message, loading: false })
       throw error
     }
@@ -166,6 +211,9 @@ function generateInvoiceNumber(): string {
   const yy = String(now.getFullYear()).slice(-2)
   const mm = String(now.getMonth() + 1).padStart(2, '0')
   const dd = String(now.getDate()).padStart(2, '0')
-  const rand = String(Math.floor(Math.random() * 10000)).padStart(4, '0')
-  return `INV-${yy}${mm}${dd}-${rand}`
+  const hh = String(now.getHours()).padStart(2, '0')
+  const min = String(now.getMinutes()).padStart(2, '0')
+  const ms = String(now.getMilliseconds()).padStart(3, '0')
+  const rand = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
+  return `INV-${yy}${mm}${dd}${hh}${min}${ms}${rand}`
 }

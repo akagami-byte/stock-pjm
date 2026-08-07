@@ -15,7 +15,7 @@ import Button from '@/components/ui/Button'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatCurrency } from '@/utils/formatters'
-import { colors, typography, radius, spacing, TRANSACTION_STATUS_COLORS } from '@/constants'
+import { colors, typography, radius, spacing, getTransactionStatusConfig } from '@/constants'
 
 import type { TransactionStatus, InvoiceGroup } from '@/types'
 
@@ -72,13 +72,22 @@ export default function TransactionListScreen() {
     return Array.from(set).sort()
   }, [invoiceGroups])
 
-  const statusOptions: StatusFilter[] = [
-    'Semua',
-    'RESERVED',
-    'COMPLETED',
-    'CANCELLED',
-    'RETURNED',
-  ]
+  // Status filter options — label disesuaikan role (admin: "Menunggu Approval", owner: "Butuh Approval")
+  const statusOptions: { value: StatusFilter; label: string }[] = useMemo(() => {
+    const all: TransactionStatus[] = [
+      'PENDING_APPROVAL',
+      'ACCEPTED',
+      'REJECTED',
+      'RESERVED',
+      'COMPLETED',
+      'CANCELLED',
+      'RETURNED',
+    ]
+    return [
+      { value: 'Semua', label: 'Semua' },
+      ...all.map((s) => ({ value: s, label: getTransactionStatusConfig(s, role).label })),
+    ]
+  }, [role])
 
   const handleRefresh = useCallback(() => {
     fetchTransactions({ date_from: dateFrom || undefined, date_to: dateTo || undefined })
@@ -90,11 +99,7 @@ export default function TransactionListScreen() {
   }
 
   const renderItem = ({ item }: { item: InvoiceGroup }) => {
-    const statusColor = TRANSACTION_STATUS_COLORS[item.status] ?? {
-      background: '#6B7280',
-      text: '#FFFFFF',
-      label: item.status,
-    }
+    const statusColor = getTransactionStatusConfig(item.status, role)
 
     return (
       <Pressable
@@ -233,7 +238,9 @@ export default function TransactionListScreen() {
               }}
             >
               <Text style={styles.dropdownText}>
-                {statusFilter === 'Semua' ? 'Semua Status' : statusFilter}
+                {statusFilter === 'Semua'
+                  ? 'Semua Status'
+                  : statusOptions.find((o) => o.value === statusFilter)?.label ?? statusFilter}
               </Text>
               <Text style={styles.dropdownArrow}>▼</Text>
             </Pressable>
@@ -242,23 +249,23 @@ export default function TransactionListScreen() {
                 <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                   {statusOptions.map((opt) => (
                     <Pressable
-                      key={opt}
+                      key={opt.value}
                       style={[
                         styles.dropdownItem,
-                        statusFilter === opt && styles.dropdownItemActive,
+                        statusFilter === opt.value && styles.dropdownItemActive,
                       ]}
                       onPress={() => {
-                        setStatusFilter(opt)
+                        setStatusFilter(opt.value)
                         setShowStatusDropdown(false)
                       }}
                     >
                       <Text
                         style={[
                           styles.dropdownItemText,
-                          statusFilter === opt && styles.dropdownItemTextActive,
+                          statusFilter === opt.value && styles.dropdownItemTextActive,
                         ]}
                       >
-                        {opt === 'Semua' ? 'Semua' : opt}
+                        {opt.label}
                       </Text>
                     </Pressable>
                   ))}

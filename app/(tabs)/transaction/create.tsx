@@ -18,6 +18,8 @@ import SearchDropdown from '@/components/ui/SearchDropdown'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useCompanyStore } from '@/stores/companyStore'
 import { useBatchStore } from '@/stores/batchStore'
+import { useAuthStore } from '@/stores/authStore'
+import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/utils/formatters'
 import { colors, typography, AUTO_SUGGEST } from '@/constants'
 import type { StockBatchWithDetails, SalesTransactionWithDetails } from '@/types'
@@ -32,10 +34,12 @@ interface CartItem {
 
 export default function CreateTransactionScreen() {
   const router = useRouter()
-  const { batchCode, company } = useLocalSearchParams<{ batchCode?: string; company?: string }>()
+  const { batchCode, batchId, company } = useLocalSearchParams<{ batchCode?: string; batchId?: string; company?: string }>()
   const transactionStore = useTransactionStore()
   const companyStore = useCompanyStore()
   const batchStore = useBatchStore()
+  const role = useAuthStore((s) => s.user?.role ?? 'owner')
+  const isAdmin = role === 'admin'
 
   // Company
   const [companyName, setCompanyName] = useState(company ?? '')
@@ -68,11 +72,6 @@ export default function CreateTransactionScreen() {
     loadAndAddBatch(code)
   }
 
-  // If came from stock detail with batchCode, auto-add
-  useEffect(() => {
-    if (batchCode) { loadAndAddBatch(batchCode) }
-  }, [batchCode])
-
   // Load companies from master data
   useEffect(() => { companyStore.fetchCompanies() }, [])
 
@@ -104,7 +103,68 @@ export default function CreateTransactionScreen() {
     setShowSuggestions(false)
   }
 
-  // Add batch to cart
+  // Helper: ambil nama perusahaan yang RESERVED batch ini
+  async function getReservedCompany(batchId: string): Promise<string | null> {
+    const { data } = await supabase
+      .from('batch_status_log')
+      .select('note')
+      .eq('batch_id', batchId)
+      .eq('new_status', 'RESERVED')
+      .order('changed_at', { ascending: false })
+      .limit(1)
+    if (data && data.length > 0) {
+      const note = data[0].note ?? ''
+      const match = note.match(/^\[DIPESAN:(.+?)\]/)
+      if (match) return match[1]
+    }
+    return null
+  }
+
+  // Add already-fetched batch directly to cart — for batches coming from stock detail
+  // (already RESERVED/PARTIALLY_SOLD — no need for status validation flow)
+  async function addBatchToCart(batch: StockBatchWithDetails): Promise<boolean> {
+    if (!companyName.trim()) {
+      return false
+    }
+    if (cart.some((item) => item.batch.batch_id === batch.batch_id)) {
+      return true
+    }
+    if (batch.status === 'SOLD_OUT' || batch.current_qty <= 0) {
+      Alert.alert('Error', 'Stok batch ini habis')
+      return true
+    }
+    // Cek company matching: batch RESERVED/PARTIALLY_SOLD harus oleh perusahaan yang sama
+    if (batch.status === 'RESERVED' || batch.status === 'PARTIALLY_SOLD') {
+      const reservedComp = await getReservedCompany(batch.batch_id)
+      if (reservedComp && reservedComp.toLowerCase() !== companyName.trim().toLowerCase()) {
+        Alert.alert(
+          'Tidak Bisa Menambahkan',
+          `Batch ini dipesan oleh "${reservedComp}", bukan "${companyName.trim()}".`
+        )
+        return false
+      }
+    }
+    const variant = batch.variant
+    const effectivePrice = (variant?.product?.base_price ?? 0) + (variant?.price_modifier ?? 0)
+    setCart((prev) => [...prev, { batch, quantity_sold: 1, price_per_unit: effectivePrice }])
+    return true
+  }
+
+  // If came from stock detail with batchCode/batchId, auto-add
+  useEffect(() => {
+    if (!batchId && !batchCode) return
+    if (!companyName.trim()) return // belum ada company, lewati
+
+    if (batchId) {
+      batchStore.fetchBatchById(batchId).then((batch) => {
+        if (batch) addBatchToCart(batch)
+      }).catch(() => {
+        if (batchCode) loadAndAddBatch(batchCode)
+      })
+    } else if (batchCode) {
+      loadAndAddBatch(batchCode)
+    }
+  }, [batchCode, batchId, companyName])
   async function loadAndAddBatch(code: string) {
     if (!code.trim()) return
     if (!companyName.trim()) {
@@ -197,6 +257,23 @@ export default function CreateTransactionScreen() {
             },
           ]
         )
+        return
+      }
+      // RESERVED / PARTIALLY_SOLD — cek company matching dulu
+      if (batch.status === 'RESERVED' || batch.status === 'PARTIALLY_SOLD') {
+        const reservedComp = await getReservedCompany(batch.batch_id)
+        if (reservedComp && reservedComp.toLowerCase() !== companyName.trim().toLowerCase()) {
+          Alert.alert(
+            'Tidak Bisa Menambahkan',
+            `Batch ini dipesan oleh "${reservedComp}", bukan "${companyName.trim()}".\n\n` +
+            `Untuk memesan oleh perusahaan berbeda, ubah status batch ke RESERVED terlebih dahulu dengan nama perusahaan baru.`
+          )
+          return
+        }
+        const variant = batch.variant
+        const effectivePrice = (variant?.product?.base_price ?? 0) + (variant?.price_modifier ?? 0)
+        setCart((prev) => [...prev, { batch, quantity_sold: 1, price_per_unit: effectivePrice }])
+        setSearchCode('')
         return
       }
       if (batch.status === 'OBSOLETE') {
@@ -294,17 +371,31 @@ export default function CreateTransactionScreen() {
         notes: notes || undefined,
       })
 
-      Alert.alert(
-        'Transaksi Berhasil',
-        `Invoice #${invoiceNumber}\nTotal: ${formatCurrency(totalAmount)}`,
-        [
-          { text: 'OK', onPress: () => router.back() },
-          {
-            text: 'Lihat Transaksi',
-            onPress: () => router.replace('/transaction'),
-          },
-        ]
-      )
+      if (isAdmin) {
+        Alert.alert(
+          'Transaksi Diajukan',
+          `Invoice #${invoiceNumber}\nTotal: ${formatCurrency(totalAmount)}\n\n⏳ Menunggu persetujuan Owner. Stok belum berkurang.`,
+          [
+            { text: 'OK', onPress: () => router.back() },
+            {
+              text: 'Lihat Transaksi',
+              onPress: () => router.replace('/transaction'),
+            },
+          ]
+        )
+      } else {
+        Alert.alert(
+          'Transaksi Berhasil',
+          `Invoice #${invoiceNumber}\nTotal: ${formatCurrency(totalAmount)}`,
+          [
+            { text: 'OK', onPress: () => router.back() },
+            {
+              text: 'Lihat Transaksi',
+              onPress: () => router.replace('/transaction'),
+            },
+          ]
+        )
+      }
     } catch (err: any) {
       Alert.alert('Error', err.message ?? 'Gagal menyimpan transaksi')
     }
@@ -313,6 +404,16 @@ export default function CreateTransactionScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]} keyboardShouldPersistTaps="handled">
       <Text style={styles.heading}>Buat Transaksi Baru</Text>
+
+      {/* Banner approval — khusus Admin */}
+      {isAdmin && (
+        <Card style={{ borderColor: colors.warning, borderWidth: 1 }}>
+          <Text style={styles.sectionTitle}>⏳ Perlu Persetujuan Owner</Text>
+          <Text style={{ fontSize: 14, color: colors.body, lineHeight: 20 }}>
+            Transaksi akan diajukan ke Owner. Stok belum berkurang sampai disetujui.
+          </Text>
+        </Card>
+      )}
 
       {/* 1. Company Name */}
       <Card>
@@ -496,7 +597,9 @@ export default function CreateTransactionScreen() {
             </Text>
           </View>
           <Text style={styles.summaryHint}>
-            ✅ Stok akan dikurangi otomatis setelah transaksi selesai
+            {isAdmin
+              ? '⏳ Stok akan berkurang setelah transaksi disetujui Owner'
+              : '✅ Stok akan dikurangi otomatis setelah transaksi selesai'}
           </Text>
         </Card>
       )}
@@ -514,7 +617,15 @@ export default function CreateTransactionScreen() {
       {/* Save */}
       {cart.length > 0 && (
         <Button
-          title={transactionStore.loading ? 'Menyimpan...' : `💾 Simpan Transaksi · ${formatCurrency(totalAmount)}`}
+          title={
+            transactionStore.loading
+              ? isAdmin
+                ? 'Mengirim...'
+                : 'Menyimpan...'
+              : isAdmin
+                ? `🚀 Ajukan Transaksi · ${formatCurrency(totalAmount)}`
+                : `💾 Simpan Transaksi · ${formatCurrency(totalAmount)}`
+          }
           onPress={handleSave}
           loading={transactionStore.loading}
           fullWidth

@@ -60,16 +60,30 @@ export type ScanType =
 
 /**
  * Sales transaction lifecycle status.
- * RESERVED  – Items reserved, pending pickup
- * COMPLETED – Items picked up, sale finalized
- * CANCELLED – Transaction cancelled before pickup
- * RETURNED  – Items returned after completion
+ * PENDING_APPROVAL – Submitted by admin, awaiting owner approval (stock NOT deducted)
+ * ACCEPTED        – Approved by owner, stock deducted
+ * REJECTED        – Rejected by owner, stock untouched
+ * RESERVED        – Items reserved, pending pickup
+ * COMPLETED       – Items picked up, sale finalized
+ * CANCELLED       – Transaction cancelled before pickup
+ * RETURNED        – Items returned after completion
  */
 export type TransactionStatus =
+  | 'PENDING_APPROVAL'
+  | 'ACCEPTED'
+  | 'REJECTED'
   | 'RESERVED'
   | 'COMPLETED'
   | 'CANCELLED'
   | 'RETURNED';
+
+/**
+ * Application user role.
+ * owner – full access (all tabs) + can approve/reject admin transactions
+ * admin – full access (all tabs), transactions require owner approval
+ * staff – limited (Label, Scan, Stok only)
+ */
+export type UserRole = 'owner' | 'admin' | 'staff';
 
 /**
  * Recent activity type for the dashboard feed.
@@ -351,8 +365,8 @@ export interface User {
   avatar_url: string | null;
   /** Whether user is internal (premium) — gets Supabase sync access */
   is_premium: boolean;
-  /** User role: owner (full access) or staff (limited: Label, Scan, Stok) */
-  role: 'owner' | 'staff';
+  /** User role: owner (full access + approval), admin (full access, needs approval), staff (limited: Label, Scan, Stok) */
+  role: UserRole;
 }
 
 // =============================================================================
@@ -620,6 +634,11 @@ export interface CreateTransactionInput {
   items: TransactionLineItem[];
   /** Optional transaction-level notes */
   notes?: string;
+  /**
+   * Optional status override. When omitted the store derives it from the
+   * creator's role: admin → PENDING_APPROVAL, owner → COMPLETED.
+   */
+  status?: TransactionStatus;
 }
 
 /** Input for proposing an alternative price. */
@@ -678,13 +697,23 @@ export interface AuthStoreState {
   error: string | null;
   /** Whether user is currently authenticated */
   isAuthenticated: boolean;
+  /** Pending email awaiting OTP verification */
+  pendingEmail: string | null;
 }
 
 export interface AuthStoreActions {
   /** Sign in with email + password */
   login: (email: string, password: string) => Promise<void>;
+  /** Sign in with Google OAuth */
+  loginWithGoogle: () => Promise<void>;
   /** Register with email + password */
   signUp: (email: string, password: string) => Promise<void>;
+  /** Send OTP code to email */
+  sendOtp: (email: string) => Promise<void>;
+  /** Verify OTP code for email */
+  verifyOtp: (email: string, token: string) => Promise<void>;
+  /** Resend OTP code to pendingEmail */
+  resendOtp: () => Promise<void>;
   /** Sign out and clear session */
   logout: () => Promise<void>;
   /** Restore session from storage on app launch */
@@ -837,6 +866,10 @@ export interface TransactionStoreActions {
   fetchTransactions: (filters?: TransactionFilterParams) => Promise<void>;
   /** Create a new multi-product transaction */
   createTransaction: (input: CreateTransactionInput) => Promise<string>;
+  /** Approve an entire invoice group (PENDING_APPROVAL → ACCEPTED, stock deducted by DB trigger) */
+  approveInvoiceGroup: (invoiceNumber: string) => Promise<void>;
+  /** Reject an entire invoice group (PENDING_APPROVAL → REJECTED, stock untouched) */
+  rejectInvoiceGroup: (invoiceNumber: string) => Promise<void>;
   /** Cancel a transaction */
   cancelTransaction: (salesId: string) => Promise<void>;
   /** Return a transaction */

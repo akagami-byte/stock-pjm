@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
 import {
-  View, Text, FlatList, Pressable, TextInput, ActivityIndicator, StyleSheet, Alert,
+  View, Text, FlatList, Pressable, TextInput, ActivityIndicator, StyleSheet, Alert, Image,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
@@ -128,7 +128,9 @@ export default function LabelListScreen() {
           <Pressable onPress={() => { setSelectMode(false); setSelected(new Set()) }} style={styles.cancelBtn}>
             <Icon name="cross" size={18} color={colors.muted} />
           </Pressable>
-          <Button title="Cetak" size="sm" onPress={handlePrint} />
+          <Pressable onPress={handlePrint} style={styles.downloadBtn}>
+            <Image source={require('@/assets/icons/downloads.png')} style={styles.downloadIcon} resizeMode="contain" />
+          </Pressable>
         </View>
       )}
 
@@ -225,4 +227,17 @@ const styles = StyleSheet.create({
   code: { fontSize: 16, fontWeight: '700', color: colors.ink, fontFamily: typography.font.mono },
   product: { fontSize: 13, color: colors.body, marginTop: 2 },
   meta: { fontSize: 11, color: colors.muted, marginTop: 2 },
+  downloadBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.ink,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  downloadIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#FFFFFF',
+  },
 })

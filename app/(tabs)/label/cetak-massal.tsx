@@ -64,7 +64,7 @@ export default function CetakMassalScreen() {
 
   const handleCetakLabel = async () => {
     if (selected.size === 0) {
-      Alert.alert('Info', 'Pilih minimal satu batch untuk dicetak')
+      Alert.alert('Info', 'Pilih minimal satu batch untuk diunduh')
       return
     }
 
@@ -92,9 +92,9 @@ export default function CetakMassalScreen() {
         pageSize: selectedPaper.name as 'A4' | 'Letter' | 'A5',
       })
 
-      Alert.alert('Berhasil', `${items.length} label berhasil dicetak ke PDF`)
+      Alert.alert('Berhasil', `${items.length} label berhasil diunduh ke PDF`)
     } catch (e: any) {
-      Alert.alert('Gagal', e?.message ?? 'Gagal mencetak label')
+      Alert.alert('Gagal', e?.message ?? 'Gagal mengunduh label')
     } finally {
       setPrinting(false)
     }
@@ -137,8 +137,8 @@ export default function CetakMassalScreen() {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>‹ Kembali</Text>
         </Pressable>
-        <Text style={styles.heading}>Cetak Massal</Text>
-        <Text style={styles.subheading}>Pilih batch untuk dicetak label barcode</Text>
+        <Text style={styles.heading}>Unduh Massal</Text>
+        <Text style={styles.subheading}>Pilih batch untuk diunduh label barcode</Text>
       </View>
 
       {/* Action bar */}
@@ -226,7 +226,7 @@ export default function CetakMassalScreen() {
             <Text style={styles.bottomLabel}>{selected.size} batch terpilih</Text>
           </View>
           <Button
-            title={printing ? 'Mencetak...' : 'Cetak Label'}
+            title={printing ? 'Mengunduh...' : 'Unduh Label'}
             variant="primary"
             onPress={handleCetakLabel}
             loading={printing}

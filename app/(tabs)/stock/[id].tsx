@@ -18,6 +18,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import BarcodeVisual from '@/components/ui/BarcodeVisual'
 import { useBatchStore } from '@/stores/batchStore'
+import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatCurrency, formatDateTime } from '@/utils/formatters'
 import { supabase } from '@/lib/supabase'
 import { useCompanyStore } from '@/stores/companyStore'
@@ -91,6 +92,8 @@ export default function StockDetailScreen() {
   const batchStore = useBatchStore()
   const companyStore = useCompanyStore()
   const { selectedBatch, loading } = batchStore
+  const role = useAuthStore((s) => s.user?.role ?? 'staff')
+  const isOwner = role === 'owner'
 
   const [showStatusChange, setShowStatusChange] = useState(false)
   const [targetStatus, setTargetStatus] = useState<BatchStatus | null>(null)
@@ -99,6 +102,7 @@ export default function StockDetailScreen() {
   const [changingStatus, setChangingStatus] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [statusLogs, setStatusLogs] = useState<BatchStatusLog[]>([])
+  const [logsRefreshKey, setLogsRefreshKey] = useState(0)
 
   // Company search
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([])
@@ -122,6 +126,7 @@ export default function StockDetailScreen() {
   useEffect(() => {
     const statusesToShow = ['RESERVED', 'PARTIALLY_SOLD', 'SOLD_OUT']
     if (selectedBatch && statusesToShow.includes(selectedBatch.status)) {
+      // Ambil dari sales_transaction
       supabase
         .from('sales_transaction')
         .select('company_name')
@@ -132,21 +137,38 @@ export default function StockDetailScreen() {
               .map((item: any) => item.company_name)
               .filter(Boolean)
             const uniqueComps = Array.from(new Set(comps))
-            setAssociatedCompanies(uniqueComps)
-            // fallback reservedBy for redirect parameters
-            if (uniqueComps.length > 0) {
-              setReservedBy(uniqueComps[0])
+
+            // Untuk RESERVED, tambahkan company dari status log jika belum ada
+            if (selectedBatch.status === 'RESERVED' && uniqueComps.length === 0) {
+              supabase
+                .from('batch_status_log')
+                .select('note')
+                .eq('batch_id', selectedBatch.batch_id)
+                .eq('new_status', 'RESERVED')
+                .order('changed_at', { ascending: false })
+                .limit(1)
+                .then(({ data: logData }) => {
+                  if (logData && logData.length > 0) {
+                    const note = logData[0].note ?? ''
+                    const match = note.match(/^\[DIPESAN:(.+?)\]/)
+                    if (match) {
+                      setAssociatedCompanies([match[1]])
+                    } else {
+                      setAssociatedCompanies([])
+                    }
+                  } else {
+                    setAssociatedCompanies([])
+                  }
+                })
             } else {
-              setReservedBy(null)
+              setAssociatedCompanies(uniqueComps)
             }
           } else {
             setAssociatedCompanies([])
-            setReservedBy(null)
           }
         })
     } else {
       setAssociatedCompanies([])
-      setReservedBy(null)
     }
   }, [selectedBatch?.batch_id, selectedBatch?.status])
 
@@ -161,7 +183,32 @@ export default function StockDetailScreen() {
       .then(({ data, error }) => {
         if (!error && data) setStatusLogs(data as BatchStatusLog[])
       })
-  }, [id])
+  }, [id, logsRefreshKey])
+
+  // Parse reservedBy company name from status logs
+  useEffect(() => {
+    if (statusLogs.length === 0) {
+      setReservedBy(null)
+      return
+    }
+    // Cari log terbaru yang punya tag [DIPESAN:...] (status RESERVED)
+    for (let i = statusLogs.length - 1; i >= 0; i--) {
+      const log = statusLogs[i]
+      if (log.note && log.note.startsWith('[DIPESAN:')) {
+        const match = log.note.match(/^\[DIPESAN:(.+?)\]/)
+        if (match) {
+          setReservedBy(match[1])
+          return
+        }
+      }
+    }
+    // Fallback: cek associatedCompanies dari transaksi
+    if (associatedCompanies.length > 0) {
+      setReservedBy(associatedCompanies[0])
+    } else {
+      setReservedBy(null)
+    }
+  }, [statusLogs, associatedCompanies])
 
   // Filter company suggestions as user types
   useEffect(() => {
@@ -201,6 +248,7 @@ export default function StockDetailScreen() {
         pathname: '/transaction/create',
         params: {
           batchCode: batch.batch_code,
+          batchId: batch.batch_id,
           company: reservedBy || companyName || undefined,
         },
       })
@@ -236,6 +284,7 @@ export default function StockDetailScreen() {
       })
       Alert.alert('Berhasil', `Status: ${batch.status} → ${targetStatus}`)
       setShowStatusChange(false)
+      setLogsRefreshKey((k) => k + 1)
       batchStore.fetchBatchById(batch.batch_id)
     } catch (err: any) {
       Alert.alert('Error', err.message)
@@ -326,11 +375,13 @@ export default function StockDetailScreen() {
               </View>
             )}
 
-            {/* Harga Efektif - prominent using typography.title-sm */}
+            {/* Harga Efektif — hanya owner */}
+            {isOwner && (
             <View style={[styles.techRow, styles.hargaRow]}>
               <Text style={styles.hargaLabel}>Harga Efektif</Text>
               <Text style={styles.hargaValue}>{formatCurrency(effectivePrice)}</Text>
             </View>
+            )}
           </View>
         </View>
 
@@ -376,7 +427,7 @@ export default function StockDetailScreen() {
             </View>
           </View>
 
-          {effectivePrice > 0 && (
+          {isOwner && effectivePrice > 0 && (
             <View style={styles.totalValueRow}>
               <Text style={styles.totalValueLabel}>Total Nilai</Text>
               <Text style={styles.totalValueAmount}>
@@ -586,6 +637,7 @@ export default function StockDetailScreen() {
                 pathname: '/transaction/create',
                 params: {
                   batchCode: batch.batch_code,
+                  batchId: batch.batch_id,
                   company: reservedBy || undefined,
                 },
               })

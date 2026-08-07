@@ -600,14 +600,14 @@ export default function CreateLabelScreen() {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}>
               <Button
-                title={batchStore.loading ? 'Menyimpan...' : 'Buat'}
+                title={batchStore.loading ? 'Menyimpan...' : 'Simpan'}
                 onPress={handleSave}
                 fullWidth
                 loading={batchStore.loading}
                 disabled={batchStore.loading || printing}
               />
             </View>
-            <View style={{ flex: 1 }}>
+            {/*<View style={{ flex: 1 }}>
               <Button
                 title={printing ? 'Menyimpan...' : 'Buat & Simpan'}
                 onPress={handleSaveAndPrint}
@@ -616,7 +616,7 @@ export default function CreateLabelScreen() {
                 loading={printing}
                 disabled={batchStore.loading || printing}
               />
-            </View>
+            </View>*/}
           </View>
 
           <View style={{ height: 8 }} />

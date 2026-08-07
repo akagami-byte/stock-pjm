@@ -2,6 +2,7 @@
 
 # dependencies
 node_modules/
+docsmd/
 
 # Expo
 .expo/
@@ -57,6 +58,8 @@ figma-folder/
 SUPABASE-CONNECT.md.swp
 DEPENDENCY.md
 BUILD_SETUP.md
+ADMIN_IMPLEMENTATION_REPORT.md
+implementation.md
 .github/
 .swp
 

@@ -34,17 +34,25 @@ export function formatDate(isoString: string): string {
 }
 
 /**
- * Format an ISO timestamp to DD-MM-YYYY HH:mm.
- * E.g. "2026-05-26T10:30:00Z" → "26-05-2026 10:30"
+ * Format an ISO timestamp to DD-MM-YYYY HH:mm in device local timezone.
+ * E.g. "2026-05-26T10:30:00Z" → "26-05-2026 17:30" (WIB/UTC+7)
+ * Uses Intl.DateTimeFormat — reliable across Hermes/JSC, respects device TZ.
  */
 export function formatDateTime(isoString: string): string {
   const date = new Date(isoString)
-  const dd = String(date.getDate()).padStart(2, '0')
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const yyyy = date.getFullYear()
-  const hh = String(date.getHours()).padStart(2, '0')
-  const min = String(date.getMinutes()).padStart(2, '0')
-  return `${dd}-${mm}-${yyyy} ${hh}:${min}`
+  // Jika timestamp tidak punya timezone info, parse as UTC dulu
+  // (Supabase TIMESTAMPTZ returns with offset, tapi kalau WITHOUT TZ, kita asumsikan UTC)
+  const ms = date.getTime()
+  if (isNaN(ms)) return isoString.slice(0, 16)
+
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
 }
 
 /**

@@ -12,7 +12,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Button from '@/components/ui/Button'
 import { useTransactionStore } from '@/stores/transactionStore'
-import { colors, typography, radius, spacing, TRANSACTION_STATUS_COLORS } from '@/constants'
+import { useAuthStore } from '@/stores/authStore'
+import { colors, typography, radius, spacing, getTransactionStatusConfig } from '@/constants'
 import { formatDate, formatCurrency, formatNumber } from '@/utils/formatters'
 import type { InvoiceGroup, TransactionStatus } from '@/types'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -31,6 +32,7 @@ export default function CompanyDetailScreen() {
   const companyName = decodeURIComponent(name ?? '')
 
   const { invoiceGroups, loading, error, fetchTransactions } = useTransactionStore()
+  const role = useAuthStore((s) => s.user?.role ?? 'owner')
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<TransactionStatus | 'ALL'>('ALL')
@@ -146,11 +148,7 @@ export default function CompanyDetailScreen() {
         data={filteredTransactions}
         keyExtractor={(g) => g.invoice_number}
         renderItem={({ item }: { item: InvoiceGroup }) => {
-          const statusColor = TRANSACTION_STATUS_COLORS[item.status] ?? {
-            background: colors.muted,
-            text: colors.onPrimary,
-            label: item.status,
-          }
+          const statusColor = getTransactionStatusConfig(item.status, role)
           return (
             <View style={styles.txCard}>
               <View style={styles.txHeader}>
@@ -345,7 +343,7 @@ export default function CompanyDetailScreen() {
                       const statusColor =
                         status === 'ALL'
                           ? null
-                          : TRANSACTION_STATUS_COLORS[status]
+                          : getTransactionStatusConfig(status, role)
                       return (
                         <Pressable
                           key={status}

@@ -5,7 +5,7 @@
 // Figma light theme with Inter + JetBrains Mono typography.
 // =============================================================================
 
-import type { BatchStatus, Finishing, TransactionStatus } from '@/types'
+import type { BatchStatus, Finishing, TransactionStatus, UserRole } from '@/types'
 
 // ═══════════════════════════════════════════════════════════════════
 // 1. COLOR PALETTE
@@ -67,10 +67,42 @@ export const STATUS_COLORS: Record<BatchStatus, StatusColorConfig> = {
 }
 
 export const TRANSACTION_STATUS_COLORS: Record<TransactionStatus, StatusColorConfig> = {
+  PENDING_APPROVAL: { background: '#f59e0b', text: '#ffffff', icon: '⏳', label: 'PENDING_APPROVAL' },
+  ACCEPTED:         { background: '#3b82f6', text: '#ffffff', icon: '✅', label: 'ACCEPTED' },
+  REJECTED:         { background: '#ef4444', text: '#ffffff', icon: '❌', label: 'REJECTED' },
   RESERVED:  { background: '#fb923c', text: '#ffffff', icon: '📌', label: 'RESERVED' },
   COMPLETED: { background: '#10b981', text: '#ffffff', icon: '✅', label: 'COMPLETED' },
   CANCELLED: { background: '#ef4444', text: '#ffffff', icon: '❌', label: 'CANCELLED' },
   RETURNED:  { background: '#6b7280', text: '#ffffff', icon: '🔄', label: 'RETURNED' },
+}
+
+/**
+ * Role-aware status display config for transactions.
+ * Admin melihat label approval (Menunggu Approval / Approval diterima / Approval ditolak),
+ * Owner melihat label keputusan (Butuh Approval / Accepted / Approval tertolak).
+ */
+export function getTransactionStatusConfig(
+  status: TransactionStatus,
+  role: UserRole
+): StatusColorConfig {
+  const base: StatusColorConfig =
+    TRANSACTION_STATUS_COLORS[status] ?? {
+      background: '#6b7280',
+      text: '#ffffff',
+      icon: '•',
+      label: status,
+    }
+
+  if (status === 'PENDING_APPROVAL') {
+    return { ...base, label: role === 'owner' ? 'Butuh Approval' : 'Menunggu Approval' }
+  }
+  if (status === 'ACCEPTED') {
+    return { ...base, label: role === 'owner' ? 'Accepted' : 'Approval diterima' }
+  }
+  if (status === 'REJECTED') {
+    return { ...base, label: role === 'owner' ? 'Approval tertolak' : 'Approval ditolak' }
+  }
+  return base
 }
 
 export function getStatusColor(status: BatchStatus): StatusColorConfig {
@@ -146,7 +178,7 @@ export const STATUS_TRANSITIONS: StatusTransitionMap = {
   ACTIVE: ['AVAILABLE'],
   AVAILABLE: ['RESERVED', 'SOLD_OUT', 'OBSOLETE'],
   RESERVED: ['AVAILABLE', 'PARTIALLY_SOLD', 'SOLD_OUT'],
-  PARTIALLY_SOLD: ['SOLD_OUT', 'AVAILABLE'],
+  PARTIALLY_SOLD: ['SOLD_OUT', 'AVAILABLE', 'RESERVED'],
   SOLD_OUT: ['PARTIALLY_SOLD', 'ARCHIVED'],
   OBSOLETE: ['ARCHIVED'],
   ARCHIVED: [],
@@ -205,6 +237,10 @@ export const TRANSITION_REQUIREMENTS: Partial<
   PARTIALLY_SOLD_SOLD_OUT: {
     requiresCompany: false, requiresNote: false, requiresQuantity: false,
     description: 'Akan diarahkan ke halaman transaksi',
+  },
+  PARTIALLY_SOLD_RESERVED: {
+    requiresCompany: true, requiresNote: false, requiresQuantity: false,
+    description: 'Pilih perusahaan pembeli (WAJIB)',
   },
   SOLD_OUT_PARTIALLY_SOLD: {
     requiresCompany: false, requiresNote: true, requiresQuantity: false,

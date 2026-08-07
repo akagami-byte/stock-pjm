@@ -17,6 +17,33 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     // Column already exists or table doesn't exist yet
   }
 
+  // Migration: hapus UNIQUE constraint dari invoice_number (v1 → v2)
+  // SQLite doesn't support ALTER TABLE DROP CONSTRAINT, recreate table
+  try {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS sales_transaction_v2 (
+        sales_id TEXT PRIMARY KEY,
+        batch_id TEXT NOT NULL REFERENCES stock_batch(batch_id),
+        company_name TEXT NOT NULL,
+        quantity_sold INTEGER NOT NULL CHECK(quantity_sold > 0),
+        price_per_unit REAL NOT NULL CHECK(price_per_unit >= 0),
+        alt_price_id TEXT REFERENCES alternative_prices(alt_price_id),
+        total_amount REAL GENERATED ALWAYS AS (quantity_sold * price_per_unit) STORED,
+        transaction_date TEXT DEFAULT (datetime('now')),
+        invoice_number TEXT,
+        status TEXT DEFAULT 'RESERVED',
+        taken_date TEXT,
+        created_by TEXT,
+        notes TEXT
+      );
+      INSERT OR IGNORE INTO sales_transaction_v2 SELECT * FROM sales_transaction;
+      DROP TABLE IF EXISTS sales_transaction;
+      ALTER TABLE sales_transaction_v2 RENAME TO sales_transaction;
+    `);
+  } catch (e) {
+    // Table already migrated or doesn't exist yet
+  }
+
   // ─── Schema mirror (matches Supabase) ───────────────────────────────
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS product_types (
@@ -128,7 +155,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
       alt_price_id TEXT REFERENCES alternative_prices(alt_price_id),
       total_amount REAL GENERATED ALWAYS AS (quantity_sold * price_per_unit) STORED,
       transaction_date TEXT DEFAULT (datetime('now')),
-      invoice_number TEXT UNIQUE,
+      invoice_number TEXT,
       status TEXT DEFAULT 'RESERVED',
       taken_date TEXT,
       created_by TEXT,

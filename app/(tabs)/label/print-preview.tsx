@@ -98,10 +98,10 @@ export default function PrintPreviewScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.heading}>Cetak Massal</Text>
-      <Text style={styles.subtitle}>{items.length} batch siap dicetak</Text>
+      <Text style={styles.heading}>Unduh Massal</Text>
+      <Text style={styles.subtitle}>{items.length} batch siap diunduh</Text>
 
-      {/* Pengaturan Cetak */}
+      {/* Pengaturan Unduh */}
       <Card>
         <Text style={styles.sectionTitle}>Ukuran Kertas</Text>
         <View style={styles.chipRow}>
@@ -141,11 +141,11 @@ export default function PrintPreviewScreen() {
       </Card>
 
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+        {/*<View style={{ flex: 1 }}>
+          <Button title="💾 Unduh" onPress={() => handleSave(false)} fullWidth loading={printing} />
+        </View>*/}
         <View style={{ flex: 1 }}>
-          <Button title="🖨️ Cetak" onPress={() => handleSave(false)} fullWidth loading={printing} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button title="💾 Cetak & Simpan" onPress={() => handleSave(true)} fullWidth variant="primary" loading={printing} />
+          <Button title="💾 Unduh & Simpan" onPress={() => handleSave(true)} fullWidth variant="primary" loading={printing} />
         </View>
       </View>
 

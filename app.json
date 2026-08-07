@@ -2,7 +2,7 @@
   "expo": {
     "name": "Bengkel Las",
     "slug": "pjm-stock",
-    "owner": "stock-app",
+    "owner": "akagami-byte",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/stockaja-logo-square.png",
@@ -31,9 +31,7 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.akagamibyte.pjmstock"
     },
-    "web": {
-      "output": "static"
-    },
+    "web": {},
     "plugins": [
       "expo-router",
       [

@@ -51,21 +51,33 @@ const AppleIcon = () => (
 
 export default function LoginScreen() {
   const router = useRouter()
-  const { login, loading, error, clearError } = useAuthStore()
+  const { sendOtp, loginWithGoogle, loading, error, clearError } = useAuthStore()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
+  // const [password, setPassword] = useState('')
+  // const [isPasswordVisible, setIsPasswordVisible] = useState(false)
 
-  // Validation checks for login button activity state
+  // Validation checks for login button activity state (Passwordless: Email only)
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-  const isPasswordValid = password.length >= 8
-  const isFormValid = isEmailValid && isPasswordValid
+  // const isPasswordValid = password.length >= 8
+  const isFormValid = isEmailValid
 
   const handleLogin = async () => {
     if (!isFormValid) return
 
     try {
-      await login(email.trim(), password)
+      await sendOtp(email.trim())
+      router.push({
+        pathname: '/(auth)/otp-verify',
+        params: { email: email.trim() },
+      })
+    } catch (err) {
+      // Error is handled in Zustand store & shown via banner
+    }
+  }
+
+  const handleGoogleLogin = async () => {
+    try {
+      await loginWithGoogle()
       router.replace('/(tabs)')
     } catch (err) {
       // Error is handled in Zustand store & shown via banner
@@ -73,6 +85,10 @@ export default function LoginScreen() {
   }
 
   const handleSocialLogin = (provider: string) => {
+    if (provider === 'Google') {
+      handleGoogleLogin()
+      return
+    }
     Alert.alert(
       'Informasi',
       `Fitur masuk dengan ${provider} akan segera hadir.`
@@ -117,9 +133,9 @@ export default function LoginScreen() {
                   />
                 </Svg>
               )}
-              <Text style={styles.brandTitle}>Leafboard</Text>
+              <Text style={styles.brandTitle}>Stockaja</Text>
             </View>
-            <Text style={styles.subtitle}>Work without limits</Text>
+            <Text style={styles.subtitle}>Satu platform untuk atur stok</Text>
           </View>
 
           {/* Form */}
@@ -149,7 +165,8 @@ export default function LoginScreen() {
               />
             </View>
 
-            {/* Password Field */}
+            {/* Password Field (Commented out for Passwordless OTP Login) */}
+            {/*
             <View style={styles.inputGroup}>
               <View style={styles.passwordHeaderRow}>
                 <Text style={styles.label}>Choose a password</Text>
@@ -181,6 +198,7 @@ export default function LoginScreen() {
                 </Pressable>
               </View>
             </View>
+            */}
 
             {/* Submit Button */}
             <Pressable
@@ -219,23 +237,35 @@ export default function LoginScreen() {
           </View>
 
           {/* Social Authentication */}
-          <View style={styles.socialContainer}>
+          {/*<View style={styles.socialContainer}>
             <Pressable
-              style={({ pressed }) => [styles.socialButton, pressed && styles.socialButtonPressed]}
-              onPress={() => handleSocialLogin('Google')}
+              style={({ pressed }) => [
+                styles.socialButton,
+                pressed && styles.socialButtonPressed,
+                loading && styles.socialButtonDisabled,
+              ]}
+              onPress={handleGoogleLogin}
+              disabled={loading}
             >
-              <GoogleIcon />
-              <Text style={styles.socialButtonText}>Sign up with Google</Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="#0F1E36" />
+              ) : (
+                <>
+                  <GoogleIcon />
+                  <Text style={styles.socialButtonText}>Sign in with Google</Text>
+                </>
+              )}
             </Pressable>
 
             <Pressable
               style={({ pressed }) => [styles.socialButton, pressed && styles.socialButtonPressed]}
               onPress={() => handleSocialLogin('Apple')}
+              disabled={loading}
             >
               <AppleIcon />
               <Text style={styles.socialButtonText}>Sign up with Apple</Text>
             </Pressable>
-          </View>
+          </View>*/}
 
           {/* Footer Redirection */}
           <View style={styles.footer}>
@@ -417,6 +447,9 @@ const styles = StyleSheet.create({
   },
   socialButtonPressed: {
     backgroundColor: '#F8FAFC',
+  },
+  socialButtonDisabled: {
+    opacity: 0.6,
   },
   socialIcon: {
     marginRight: spacing.sm,

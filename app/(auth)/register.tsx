@@ -51,26 +51,25 @@ const AppleIcon = () => (
 
 export default function RegisterScreen() {
   const router = useRouter()
-  const { signUp, loading, error, clearError } = useAuthStore()
+  const { sendOtp, loading, error, clearError } = useAuthStore()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
+  // const [password, setPassword] = useState('')
+  // const [isPasswordVisible, setIsPasswordVisible] = useState(false)
 
-  // Validation checks: email is valid format & password is at least 8 characters
+  // Validation checks: email is valid format (Passwordless: Email only)
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-  const isPasswordValid = password.length >= 8
-  const isFormValid = isEmailValid && isPasswordValid
+  // const isPasswordValid = password.length >= 8
+  const isFormValid = isEmailValid
 
   const handleRegister = async () => {
     if (!isFormValid) return
 
     try {
-      await signUp(email.trim(), password)
-      Alert.alert(
-        'Registrasi Berhasil',
-        'Pendaftaran Anda berhasil! Silakan periksa email untuk konfirmasi atau langsung masuk.',
-        [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
-      )
+      await sendOtp(email.trim())
+      router.push({
+        pathname: '/(auth)/otp-verify',
+        params: { email: email.trim() },
+      })
     } catch (err) {
       // Error is set in store
     }
@@ -121,16 +120,16 @@ export default function RegisterScreen() {
                   />
                 </Svg>
               )}
-              <Text style={styles.brandTitle}>Leafboard</Text>
+              <Text style={styles.brandTitle}>stockaja</Text>
             </View>
-            <Text style={styles.subtitle}>Work without limits</Text>
+            <Text style={styles.subtitle}>Atur stok kini jadi lebih mudah</Text>
           </View>
 
           {/* Form */}
           <View style={styles.formContainer}>
             {error && (
               <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>⚠️ {error}</Text>
+                <Text style={styles.errorText}> {error}</Text>
               </View>
             )}
 
@@ -153,7 +152,8 @@ export default function RegisterScreen() {
               />
             </View>
 
-            {/* Password Field */}
+            {/* Password Field (Commented out for Passwordless OTP Login) */}
+            {/*
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Choose a password</Text>
               <View style={styles.passwordWrapper}>
@@ -183,6 +183,7 @@ export default function RegisterScreen() {
                 </Pressable>
               </View>
             </View>
+            */}
 
             {/* Submit Button */}
             <Pressable
@@ -221,7 +222,7 @@ export default function RegisterScreen() {
           </View>
 
           {/* Social Authentication */}
-          <View style={styles.socialContainer}>
+          {/*<View style={styles.socialContainer}>
             <Pressable
               style={({ pressed }) => [styles.socialButton, pressed && styles.socialButtonPressed]}
               onPress={() => handleSocialRegister('Google')}
@@ -237,7 +238,7 @@ export default function RegisterScreen() {
               <AppleIcon />
               <Text style={styles.socialButtonText}>Sign up with Apple</Text>
             </Pressable>
-          </View>
+          </View>*/}
 
           {/* Footer Redirection */}
           <View style={styles.footer}>
@@ -360,8 +361,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9', // Screen 2: gray style
   },
   submitButtonActive: {
-    backgroundColor: '#A3E635', // Screen 3: lime style
-    shadowColor: '#A3E635',
+    backgroundColor: '#0915eb', // Screen 3: blue style
+    shadowColor: '#0915eb',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
