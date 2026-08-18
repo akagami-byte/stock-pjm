@@ -16,6 +16,7 @@ import { useRouter, useFocusEffect } from 'expo-router'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
+import DatePickerField from '@/components/ui/DatePickerField'
 import { useBatchStore } from '@/stores/batchStore'
 import { useCompanyStore } from '@/stores/companyStore'
 import { formatDate } from '@/utils/formatters'
@@ -368,24 +369,20 @@ export default function StockListScreen() {
                   Periode Masuk
                 </Text>
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <View style={{ flex: 1 }}>
-                    <TextInput
-                      style={styles.searchInput}
-                      value={startDate}
-                      onChangeText={setStartDate}
-                      placeholder="Mulai (YYYY-MM-DD)"
-                      placeholderTextColor="#9ca3af"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <TextInput
-                      style={styles.searchInput}
-                      value={endDate}
-                      onChangeText={setEndDate}
-                      placeholder="Selesai (YYYY-MM-DD)"
-                      placeholderTextColor="#9ca3af"
-                    />
-                  </View>
+                  <DatePickerField
+                    value={startDate}
+                    onChange={setStartDate}
+                    placeholder="Mulai"
+                    containerStyle={{ flex: 1 }}
+                    inputStyle={styles.searchInput}
+                  />
+                  <DatePickerField
+                    value={endDate}
+                    onChange={setEndDate}
+                    placeholder="Selesai"
+                    containerStyle={{ flex: 1 }}
+                    inputStyle={styles.searchInput}
+                  />
                 </View>
               </View>
 

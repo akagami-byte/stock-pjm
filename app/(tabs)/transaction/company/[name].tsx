@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Button from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useAuthStore } from '@/stores/authStore'
 import { colors, typography, radius, spacing, getTransactionStatusConfig } from '@/constants'
@@ -187,8 +188,17 @@ export default function CompanyDetailScreen() {
           <View>
             {/* Header */}
             <View style={styles.header}>
-              <Pressable onPress={() => router.back()} style={styles.backBtn}>
-                <Text style={styles.backText}>← Kembali</Text>
+              <Pressable
+                onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back()
+                  } else {
+                    router.replace('/transaction')
+                  }
+                }}
+                style={styles.backBtn}
+              >
+                <Icon name="arrow-left" size={22} color={colors.ink} />
               </Pressable>
               <Text style={styles.heading}>{companyName}</Text>
               <Text style={styles.subheading}>Detail transaksi & statistik</Text>
@@ -452,12 +462,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     marginBottom: spacing.md,
   },
-  backBtn: { alignSelf: 'flex-start', marginBottom: spacing.xs },
-  backText: {
-    fontSize: typography.size.base,
-    color: colors.brand,
-    fontWeight: typography.weight.medium,
-  },
+  backBtn: { padding: 4 },
   heading: {
     fontSize: typography.size.xl,
     fontWeight: typography.weight.bold,

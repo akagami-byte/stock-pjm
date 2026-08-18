@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, Alert, StyleSheet, Image, TouchableOpacity } from 'react-native'
+import { View, Text, ScrollView, Alert, StyleSheet, Image, TouchableOpacity, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import { Icon } from '@/components/ui/Icon'
 import { useCompanyStore } from '@/stores/companyStore'
 import { uploadBarcodePresigned } from '@/services/s3/uploadBarcodePresigned'
 import { colors, radius } from '@/constants'
@@ -88,7 +89,23 @@ export default function CreateCompanyScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.heading}>Tambah Perusahaan Baru</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/master')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
+        </Pressable>
+        <Text style={styles.heading}>Tambah Perusahaan Baru</Text>
+        <View style={{ width: 30 }} />
+      </View>
 
       <Card>
         <Input
@@ -159,7 +176,9 @@ export default function CreateCompanyScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: 16, paddingBottom: 40 },
-  heading: { fontSize: 22, fontWeight: '700', color: colors.ink, marginBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  backBtn: { padding: 4 },
+  heading: { flex: 1, fontSize: 20, fontWeight: '700', color: colors.ink, textAlign: 'center' },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.body, marginBottom: 8 },
   uploadBox: {
     borderWidth: 2,

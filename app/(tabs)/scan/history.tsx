@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import Button from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/utils/formatters'
 import {
@@ -180,8 +181,17 @@ export default function ScanHistoryScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       {/* AppBar-style header */}
       <View style={styles.appBar}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← Kembali</Text>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/scan')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.appBarTitle}>Riwayat Scan</Text>
         <View style={styles.backBtn} />
@@ -264,14 +274,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.hairline,
   },
   backBtn: {
-    paddingVertical: spacing.xxs,
-    paddingHorizontal: spacing.xs,
-    minWidth: 80,
-  },
-  backBtnText: {
-    fontSize: typography.size.base,
-    fontFamily: typography.font.sansSemiBold,
-    color: colors.brand,
+    padding: 4,
   },
   appBarTitle: {
     fontSize: typography.size.lg,

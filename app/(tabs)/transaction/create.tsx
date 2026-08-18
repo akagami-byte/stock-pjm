@@ -15,6 +15,7 @@ import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import SearchDropdown from '@/components/ui/SearchDropdown'
+import { Icon } from '@/components/ui/Icon'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useCompanyStore } from '@/stores/companyStore'
 import { useBatchStore } from '@/stores/batchStore'
@@ -362,12 +363,18 @@ export default function CreateTransactionScreen() {
     try {
       const invoiceNumber = await transactionStore.createTransaction({
         company_name: companyName.trim(),
-        items: cart.map((item) => ({
-          batch_id: item.batch.batch_id,
-          quantity_sold: item.quantity_sold,
-          price_per_unit: item.price_per_unit,
-          alt_price_id: item.alt_price_id,
-        })),
+        items: cart.map((item) => {
+          const variant = item.batch.variant
+          const effectivePrice = (variant?.product?.base_price ?? 0) + (variant?.price_modifier ?? 0)
+          return {
+            batch_id: item.batch.batch_id,
+            quantity_sold: item.quantity_sold,
+            price_per_unit: item.price_per_unit,
+            alt_price_id: item.alt_price_id,
+            variant_id: variant?.variant_id,
+            effective_price: effectivePrice,
+          }
+        }),
         notes: notes || undefined,
       })
 
@@ -403,7 +410,23 @@ export default function CreateTransactionScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]} keyboardShouldPersistTaps="handled">
-      <Text style={styles.heading}>Buat Transaksi Baru</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/transaction')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
+        </Pressable>
+        <Text style={styles.heading}>Buat Transaksi Baru</Text>
+        <View style={{ width: 30 }} />
+      </View>
 
       {/* Banner approval — khusus Admin */}
       {isAdmin && (
@@ -760,7 +783,9 @@ export default function CreateTransactionScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: 16, gap: 12 },
-  heading: { fontSize: 22, fontWeight: '700', color: colors.ink, marginBottom: 4 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  backBtn: { padding: 4 },
+  heading: { flex: 1, fontSize: 20, fontWeight: '700', color: colors.ink, textAlign: 'center' },
   sectionTitle: { fontSize: 15, fontWeight: '600', color: colors.ink, marginBottom: 8 },
   companyRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   suggestionBox: {

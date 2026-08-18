@@ -7,17 +7,24 @@ import {
   TextInput,
   ActivityIndicator,
   Image,
+  Alert,
+  Modal,
   StyleSheet,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
+import { useCameraPermissions } from 'expo-camera'
 import Button from '@/components/ui/Button'
+import StockScanner from '@/components/scanner/StockScanner'
 import { useProductStore } from '@/stores/productStore'
 import { useCompanyStore } from '@/stores/companyStore'
 import { colors, typography, radius, spacing } from '@/constants'
 import type { ProductType, Company } from '@/types'
 
 type MasterTab = 'produk' | 'perusahaan'
+
+// QR produk: EAS-00-C-AA0001 → type_code=EAS, version=00
+const PRODUCT_SKU_REGEX = /^([A-Z0-9]{1,8})-(\d{1,2})-[A-Z]-[A-Z]{2}\d{4}$/
 
 export default function MasterScreen() {
   const router = useRouter()
@@ -28,6 +35,10 @@ export default function MasterScreen() {
   const [searchQuery, setSearchQuery] = useState('')
   const [tab, setTab] = useState<MasterTab>('produk')
 
+  // QR scanner modal
+  const [scanModalVisible, setScanModalVisible] = useState(false)
+  const [permission, requestPermission] = useCameraPermissions()
+
   useEffect(() => {
     fetchProductTypes()
     fetchProducts()
@@ -37,6 +48,59 @@ export default function MasterScreen() {
     fetchProductTypes()
     fetchProducts()
   }, [fetchProductTypes, fetchProducts])
+
+  // QR scan → parse kode produk (type_code-version) → buka detail produk
+  const handleScanSuccess = useCallback(
+    (code: string) => {
+      const match = code.match(PRODUCT_SKU_REGEX)
+      if (!match) {
+        Alert.alert('Kode Tidak Valid', `"${code}" bukan kode produk. Format: TIPE-VERSI-FINISHING-BATCH (contoh EAS-00-C-AA0001)`)
+        return
+      }
+      const typeCode = match[1]
+      const version = match[2]
+      const found = (products as any[]).find(
+        (p) => p.type?.type_code === typeCode && p.version === version
+      )
+      if (!found) {
+        Alert.alert('Produk Tidak Ditemukan', `Produk ${typeCode}-${version} tidak ada di master data`)
+        return
+      }
+      setScanModalVisible(false)
+      router.push({ pathname: '/master/product/[id]', params: { id: found.product_id } })
+    },
+    [products, router]
+  )
+
+  const openScanner = () => {
+    if (!permission?.granted) {
+      requestPermission().then((res) => {
+        if (res.granted) setScanModalVisible(true)
+        else Alert.alert('Izin Diperlukan', 'Akses kamera diperlukan untuk scan QR')
+      })
+      return
+    }
+    setScanModalVisible(true)
+  }
+
+  // Hapus perusahaan (soft delete) dengan konfirmasi
+  const handleDeleteCompany = (item: Company) => {
+    Alert.alert('Hapus Perusahaan', 'Yakin hapus perusahaan', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await companyStore.deleteCompany(item.company_id)
+            Alert.alert('Sukses', 'Perusahaan berhasil dihapus')
+          } catch (e: any) {
+            Alert.alert('Error', e?.message ?? 'Gagal menghapus perusahaan')
+          }
+        },
+      },
+    ])
+  }
 
   // Count products per type
   const getProductCount = (typeId: string) => {
@@ -117,6 +181,15 @@ export default function MasterScreen() {
           </Text>
         )}
       </View>
+      <Pressable
+        style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
+        onPress={(e) => {
+          e.stopPropagation()
+          handleDeleteCompany(item)
+        }}
+      >
+        <Text style={styles.deleteBtnText}>🗑</Text>
+      </Pressable>
     </Pressable>
   )
 
@@ -150,15 +223,23 @@ export default function MasterScreen() {
         </Text>
       </View>
 
-      {/* Search bar */}
-      <View style={styles.searchBar}>
+      {/* Search bar + Scan QR */}
+      <View style={styles.searchRow}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { flex: 1 }]}
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholder={tab === 'produk' ? 'Cari jenis produk atau kode...' : 'Cari perusahaan...'}
           placeholderTextColor={colors.mutedSoft}
         />
+        {tab === 'produk' && (
+          <Pressable
+            style={({ pressed }) => [styles.scanBtn, pressed && styles.scanBtnPressed]}
+            onPress={openScanner}
+          >
+            <Text style={styles.scanBtnText}>📷 Scan</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* List — Produk */}
@@ -219,6 +300,31 @@ export default function MasterScreen() {
         </>
       )}
 
+      {/* Modal Scanner QR Produk */}
+      <Modal visible={scanModalVisible} animationType="slide" onRequestClose={() => setScanModalVisible(false)}>
+        <View style={styles.scanModal}>
+          <View style={styles.scanHeader}>
+            <Text style={styles.scanTitle}>Scan QR Produk</Text>
+            <Pressable onPress={() => setScanModalVisible(false)} style={styles.scanCloseBtn}>
+              <Text style={styles.scanCloseText}>✕ Tutup</Text>
+            </Pressable>
+          </View>
+          {permission?.granted ? (
+            <StockScanner
+              style={styles.scanCamera}
+              onScanSuccess={handleScanSuccess}
+              frameThreshold={2}
+              lockDuration={2000}
+            />
+          ) : (
+            <View style={styles.scanNoPerm}>
+              <Text style={styles.scanNoPermText}>Kamera diperlukan untuk scan QR produk</Text>
+              <Button title="Izinkan Kamera" onPress={requestPermission} />
+            </View>
+          )}
+        </View>
+      </Modal>
+
       {/* FAB */}
       <Pressable
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
@@ -265,7 +371,14 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.muted,
   },
-  searchBar: { paddingHorizontal: spacing.md, paddingTop: spacing.xxs, paddingBottom: spacing.xs },
+  searchRow: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xxs,
+    paddingBottom: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   searchInput: {
     backgroundColor: colors.surfaceCard,
     borderWidth: 1,
@@ -275,6 +388,43 @@ const styles = StyleSheet.create({
     fontSize: typography.size.base,
     color: colors.ink,
   },
+  scanBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanBtnPressed: { backgroundColor: colors.primaryActive },
+  scanBtnText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.onPrimary,
+  },
+  scanModal: { flex: 1, backgroundColor: '#000' },
+  scanHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.canvas,
+  },
+  scanTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
+    color: colors.ink,
+  },
+  scanCloseBtn: { padding: spacing.xxs },
+  scanCloseText: {
+    fontSize: typography.size.base,
+    color: colors.brand,
+    fontWeight: typography.weight.medium,
+  },
+  scanCamera: { flex: 1 },
+  scanNoPerm: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
+  scanNoPermText: { color: colors.muted, textAlign: 'center' },
   list: { padding: spacing.md, paddingTop: spacing.xxs },
   loader: { marginTop: spacing.xxl },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg, gap: spacing.xs },
@@ -292,6 +442,16 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   cardPressed: { opacity: 0.8, backgroundColor: colors.surfaceSoft },
+  deleteBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  deleteBtnPressed: { backgroundColor: colors.error + '22' },
+  deleteBtnText: { fontSize: 15 },
   cardIcon: {
     width: 48,
     height: 48,

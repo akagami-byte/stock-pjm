@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatCurrency } from '@/utils/formatters'
@@ -162,6 +163,24 @@ export default function TransactionDetailScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/transaction')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
+        </Pressable>
+        <Text style={styles.heading}>Detail Transaksi</Text>
+        <View style={{ width: 30 }} />
+      </View>
+
       {/* Invoice Header */}
       <Card
         style={{
@@ -359,6 +378,9 @@ export default function TransactionDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  backBtn: { padding: 4 },
+  heading: { flex: 1, fontSize: 20, fontWeight: '700', color: colors.ink, textAlign: 'center' },
   content: { padding: spacing.md, gap: spacing.sm },
   loader: {
     flex: 1,

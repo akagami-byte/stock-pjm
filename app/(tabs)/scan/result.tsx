@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Image,
+  Pressable,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -14,6 +15,7 @@ import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import BarcodeVisual from '@/components/ui/BarcodeVisual'
+import { Icon } from '@/components/ui/Icon'
 import { useBatchStore } from '@/stores/batchStore'
 import { formatDate, formatCurrency } from '@/utils/formatters'
 import { getStatusColor, colors, getAllowedTransitions, STATUS_COLORS } from '@/constants'
@@ -167,6 +169,24 @@ export default function ScanResultScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/scan')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
+        </Pressable>
+        <Text style={styles.heading}>Hasil Scan</Text>
+        <View style={{ width: 30 }} />
+      </View>
+
       {/* Status Banner */}
       <Card
         style={{
@@ -293,6 +313,9 @@ export default function ScanResultScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: 16, gap: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  backBtn: { padding: 4 },
+  heading: { flex: 1, fontSize: 20, fontWeight: '700', color: colors.ink, textAlign: 'center' },
   loader: {
     flex: 1,
     backgroundColor: colors.canvas,

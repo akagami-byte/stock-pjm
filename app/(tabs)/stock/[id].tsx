@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TextInput,
   FlatList,
+  Image,
   StyleSheet,
 } from 'react-native'
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
@@ -16,7 +17,7 @@ import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import BarcodeVisual from '@/components/ui/BarcodeVisual'
+import { Icon } from '@/components/ui/Icon'
 import { useBatchStore } from '@/stores/batchStore'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatCurrency, formatDateTime } from '@/utils/formatters'
@@ -94,6 +95,7 @@ export default function StockDetailScreen() {
   const { selectedBatch, loading } = batchStore
   const role = useAuthStore((s) => s.user?.role ?? 'staff')
   const isOwner = role === 'owner'
+  const isStaff = role === 'staff'
 
   const [showStatusChange, setShowStatusChange] = useState(false)
   const [targetStatus, setTargetStatus] = useState<BatchStatus | null>(null)
@@ -235,8 +237,12 @@ export default function StockDetailScreen() {
   const variant = batch.variant
   const product = variant?.product
   const productType = (product as any)?.type
+  const productImage = product?.image_url || (productType as any)?.image_url
   const color = getStatusColor(batch.status)
   const allowedTransitions = getAllowedTransitions(batch.status)
+  const visibleTransitions = isStaff
+    ? allowedTransitions.filter((s) => s !== 'PARTIALLY_SOLD' && s !== 'SOLD_OUT')
+    : allowedTransitions
   const pct = ((batch.current_qty / batch.initial_qty) * 100).toFixed(1)
   const effectivePrice = (product?.base_price ?? 0) + (variant?.price_modifier ?? 0)
   const isLow = batch.current_qty / batch.initial_qty <= 0.05
@@ -300,6 +306,24 @@ export default function StockDetailScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back()
+              } else {
+                router.replace('/stock')
+              }
+            }}
+            style={styles.backBtn}
+          >
+            <Icon name="arrow-left" size={22} color={colors.ink} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Detail Stok</Text>
+          <View style={{ width: 30 }} />
+        </View>
+
         {/* Product Details Section */}
         <View style={styles.headerSection}>
           <View style={styles.headerTopRow}>
@@ -314,9 +338,13 @@ export default function StockDetailScreen() {
             {variant?.sku_full ?? '—'}
           </Text>
 
-          <View style={styles.barcodeWrapper}>
-            <BarcodeVisual code={batch.batch_code} height={50} />
-          </View>
+          {productImage ? (
+            <Image source={{ uri: productImage }} style={styles.productImage} />
+          ) : (
+            <View style={styles.productImagePlaceholder}>
+              <Text style={{ fontSize: 48 }}>📦</Text>
+            </View>
+          )}
 
           {isLow && (
             <View style={styles.lowStockAlert}>
@@ -482,13 +510,13 @@ export default function StockDetailScreen() {
         )}
 
         {/* Actions Section ('Ubah Status') */}
-        {allowedTransitions.length > 0 && (
+        {allowedTransitions.length > 0 && visibleTransitions.length > 0 && (
           <Card style={styles.actionContainerCard}>
             <Text style={styles.statusActionTitle}>
               Ubah Status ({batch.status})
             </Text>
             <View style={styles.statusPillsGrid}>
-              {allowedTransitions.map((status) => {
+              {visibleTransitions.map((status) => {
                 const isRedirect = REDIRECT_TO_TRANSACTION.includes(status)
                 const req = getTransitionRequirements(batch.status, status)
                 return (
@@ -627,6 +655,7 @@ export default function StockDetailScreen() {
 
         {/* Primary Actions */}
         <View style={styles.quickActions}>
+          {!isStaff && (
           <Pressable
             style={({ pressed }) => [
               styles.btnPrimary,
@@ -645,6 +674,7 @@ export default function StockDetailScreen() {
           >
             <Text style={styles.btnPrimaryText}>Buat Transaksi</Text>
           </Pressable>
+          )}
           
           <Pressable
             style={({ pressed }) => [
@@ -742,6 +772,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingVertical: spacing.xs,
   },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  backBtn: { padding: 4 },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontFamily: typography.font.sansSemiBold,
+    color: colors.ink,
+    textAlign: 'center',
+  },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -770,15 +809,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.xxs,
     marginBottom: spacing.md,
   },
-  barcodeWrapper: {
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+  productImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceCard,
+    resizeMode: 'cover',
     marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+  },
+  productImagePlaceholder: {
+    width: '100%',
+    height: 160,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceCard,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   lowStockAlert: {
     backgroundColor: '#EF444415',

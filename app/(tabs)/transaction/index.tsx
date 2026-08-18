@@ -5,13 +5,13 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
-  TextInput,
   StyleSheet,
   ScrollView,
 } from 'react-native'
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import Button from '@/components/ui/Button'
+import DatePickerField from '@/components/ui/DatePickerField'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatCurrency } from '@/utils/formatters'
@@ -202,28 +202,22 @@ export default function TransactionListScreen() {
       <View style={styles.filterContainer}>
         {/* Date filters row */}
         <View style={styles.dateRow}>
-          <View style={styles.dateInputWrap}>
-            <Text style={styles.filterLabel}>Dari</Text>
-            <TextInput
-              style={styles.dateInput}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.mutedSoft}
-              value={dateFrom}
-              onChangeText={setDateFrom}
-              maxLength={10}
-            />
-          </View>
-          <View style={styles.dateInputWrap}>
-            <Text style={styles.filterLabel}>Sampai</Text>
-            <TextInput
-              style={styles.dateInput}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.mutedSoft}
-              value={dateTo}
-              onChangeText={setDateTo}
-              maxLength={10}
-            />
-          </View>
+          <DatePickerField
+            label="Dari"
+            value={dateFrom}
+            onChange={setDateFrom}
+            placeholder="Pilih"
+            containerStyle={styles.dateInputWrap}
+            inputStyle={styles.dateInput}
+          />
+          <DatePickerField
+            label="Sampai"
+            value={dateTo}
+            onChange={setDateTo}
+            placeholder="Pilih"
+            containerStyle={styles.dateInputWrap}
+            inputStyle={styles.dateInput}
+          />
         </View>
 
         {/* Status & Company dropdown row */}

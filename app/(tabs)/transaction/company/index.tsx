@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import Button from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { colors, typography, radius, spacing } from '@/constants'
 import { formatDate, formatCurrency, formatNumber } from '@/utils/formatters'
@@ -87,8 +88,17 @@ export default function CompanyListScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Kembali</Text>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/transaction')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
         </Pressable>
         <View style={styles.headerRow}>
           <Text style={styles.heading}>Perusahaan</Text>
@@ -193,13 +203,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   backBtn: {
-    alignSelf: 'flex-start',
-    marginBottom: spacing.xxs,
-  },
-  backText: {
-    fontSize: typography.size.base,
-    color: colors.brand,
-    fontWeight: typography.weight.medium,
+    padding: 4,
   },
   headerRow: {
     flexDirection: 'row',

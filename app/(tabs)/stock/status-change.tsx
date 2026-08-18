@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { useBatchStore } from '@/stores/batchStore'
 import { useCompanyStore } from '@/stores/companyStore'
 import { supabase } from '@/lib/supabase'
@@ -156,8 +157,17 @@ export default function StatusChangeScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.appBar}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← Kembali</Text>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/stock')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.appBarTitle}>Ubah Status</Text>
         <View style={styles.backBtn} />
@@ -340,8 +350,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: spacing.sm, marginBottom: spacing.xs,
   },
-  backBtn: { paddingVertical: spacing.xxs, paddingHorizontal: spacing.xs, minWidth: 80 },
-  backBtnText: { fontSize: typography.size.base, fontFamily: typography.font.sansSemiBold, color: colors.brand },
+  backBtn: { padding: 4 },
   appBarTitle: { fontSize: typography.size.lg, fontFamily: typography.font.sansSemiBold, color: colors.ink, textAlign: 'center' },
   card: {
     backgroundColor: colors.surfaceCard, borderRadius: radius.lg,

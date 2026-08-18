@@ -9,6 +9,8 @@ interface CompanyStore {
   fetchCompanies: () => Promise<void>
   createCompany: (input: { company_name: string; address?: string; phone?: string; image_url?: string }) => Promise<Company>
   updateCompany: (companyId: string, input: { address?: string; phone?: string; image_url?: string }) => Promise<void>
+  /** Soft-delete perusahaan (is_active = false). Transaksi historis tetap utuh. */
+  deleteCompany: (companyId: string) => Promise<void>
   clearError: () => void
 }
 
@@ -85,6 +87,30 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
       }))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal memperbarui perusahaan'
+      set({ error: message, loading: false })
+      throw error
+    }
+  },
+
+  deleteCompany: async (companyId) => {
+    set({ loading: true, error: null })
+    try {
+      const { error } = await getQuery('companies')
+        .update({
+          is_active: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('company_id', companyId)
+
+      if (error) throw error
+
+      // Hapus dari state lokal — fetchCompanies hanya ambil is_active = true
+      set((s) => ({
+        companies: s.companies.filter((c) => c.company_id !== companyId),
+        loading: false,
+      }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal menghapus perusahaan'
       set({ error: message, loading: false })
       throw error
     }

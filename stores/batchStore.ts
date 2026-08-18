@@ -4,6 +4,7 @@ import { getQuery, rpc, getAuthUser } from '@/lib/dataRouter'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { canTransitionStatus } from '@/constants'
+import { getWIBDateTime } from '@/utils/time'
 
 /**
  * Batch / Label store – manages batch creation, lookup, and status updates.
@@ -244,6 +245,7 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
           old_status: batch.status,
           new_status: input.new_status,
           changed_by: userData.user?.id ?? null,
+          changed_at: getWIBDateTime(),
           note: logNote,
         })
 

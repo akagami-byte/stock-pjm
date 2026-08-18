@@ -5,6 +5,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native'
@@ -14,6 +15,7 @@ import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import SearchDropdown from '@/components/ui/SearchDropdown'
+import { Icon } from '@/components/ui/Icon'
 import { useProductStore } from '@/stores/productStore'
 import { useBatchStore } from '@/stores/batchStore'
 import { supabase } from '@/lib/supabase'
@@ -95,7 +97,7 @@ export default function CreateLabelScreen() {
       const items = products.map((p: any) => ({
         id: p.product_id,
         label: p.product_name,
-        subtitle: `Versi ${p.version} · ${formatCurrency(p.base_price)}/pcs`,
+        subtitle: `Versi ${p.version}`,
         product: p,
       }))
       setProductItems(items)
@@ -112,7 +114,7 @@ export default function CreateLabelScreen() {
       const items: VariantDisplay[] = variants.map((v) => ({
         id: v.variant_id,
         label: `${getFinishingLabel(v.finishing)}`,
-        subtitle: `SKU: ${v.sku_full} · Modifier: ${formatCurrency(v.price_modifier)}/pcs`,
+        subtitle: `SKU: ${v.sku_full}`,
         variant: v,
       }))
       setVariantItems(items)
@@ -317,7 +319,23 @@ export default function CreateLabelScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.heading}>Buat Label Baru</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/label')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
+        </Pressable>
+        <Text style={styles.heading}>Buat Label Baru</Text>
+        <View style={{ width: 30 }} />
+      </View>
 
       {/* ── Step 1: Pilih Jenis Produk ── */}
       {step === 'type' && (
@@ -422,7 +440,7 @@ export default function CreateLabelScreen() {
             {getFinishingLabel(selectedVariant.finishing)}
           </Text>
           <Text style={styles.context}>
-            SKU: {selectedVariant.sku_full} · Harga: {formatCurrency(effectivePrice)}/pcs
+            SKU: {selectedVariant.sku_full}
           </Text>
 
           <View style={{ height: 16 }} />
@@ -663,11 +681,14 @@ function incrementBatchCode(code: string): string {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: 16, paddingBottom: 40 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  backBtn: { padding: 4 },
   heading: {
-    fontSize: 22,
+    flex: 1,
+    fontSize: 20,
     fontWeight: '700',
     color: colors.ink,
-    marginBottom: 16,
+    textAlign: 'center',
   },
   stepLabel: {
     fontSize: 12,

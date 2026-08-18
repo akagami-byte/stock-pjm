@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import Button from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { supabase } from '@/lib/supabase'
 import { useBatchStore } from '@/stores/batchStore'
 import { formatDate } from '@/utils/formatters'
@@ -214,8 +215,17 @@ export default function TrashScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* AppBar-style header */}
       <View style={styles.appBar}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← Kembali</Text>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/stock')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.appBarTitle}>Trash ({trashItems.length})</Text>
         <View style={styles.backBtn} />
@@ -266,14 +276,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.hairline,
   },
   backBtn: {
-    paddingVertical: spacing.xxs,
-    paddingHorizontal: spacing.xs,
-    minWidth: 80,
-  },
-  backBtnText: {
-    fontSize: typography.size.base,
-    fontFamily: typography.font.sansSemiBold,
-    color: colors.brand,
+    padding: 4,
   },
   appBarTitle: {
     fontSize: typography.size.lg,

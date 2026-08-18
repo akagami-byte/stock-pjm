@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { TransactionStore, SalesTransactionWithDetails, InvoiceGroup, CreateTransactionInput, TransactionFilterParams, TransactionStatus } from '@/types'
 import { getQuery, getAuthUser } from '@/lib/dataRouter'
 import { useAuthStore } from '@/stores/authStore'
+import { getWIBDateTime } from '@/utils/time'
 
 /**
  * Transaction store – manages sales transactions and company auto-suggest.
@@ -61,6 +62,7 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
         price_per_unit: item.price_per_unit,
         alt_price_id: item.alt_price_id ?? null,
         invoice_number: invoiceNumber,
+        transaction_date: getWIBDateTime(),
         status,
         created_by: userData.user?.id ?? null,
         notes: input.notes ?? null,
@@ -70,6 +72,42 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
         .insert(rows)
 
       if (error) throw error
+
+      // Auto-save harga khusus (alternative_prices) untuk item yang
+      // harganya dimodifikasi ≠ harga efektif (base + modifier).
+      // Supabase: upsert via select → update/insert.
+      // SQLite: sama (adapter getQuery mendukung select/update/insert).
+      for (const item of input.items) {
+        if (!item.variant_id || item.effective_price === undefined) continue
+        if (item.price_per_unit === item.effective_price) continue
+
+        try {
+          const { data: existing } = await getQuery('alternative_prices')
+            .select('alt_price_id')
+            .eq('variant_id', item.variant_id)
+            .eq('company_name', input.company_name)
+            .limit(1)
+
+          if (existing && existing.length > 0) {
+            const { error: updErr } = await getQuery('alternative_prices')
+              .update({ proposed_price: item.price_per_unit })
+              .eq('alt_price_id', existing[0].alt_price_id)
+            if (updErr) console.warn('Failed to update alternative price:', updErr)
+          } else {
+            const { error: insErr } = await getQuery('alternative_prices')
+              .insert({
+                variant_id: item.variant_id,
+                company_name: input.company_name,
+                proposed_price: item.price_per_unit,
+                min_quantity: 1,
+                requested_by: userData.user?.id ?? null,
+              })
+            if (insErr) console.warn('Failed to insert alternative price:', insErr)
+          }
+        } catch (e) {
+          console.warn('Failed to save alternative price:', e)
+        }
+      }
 
       await get().fetchTransactions()
 

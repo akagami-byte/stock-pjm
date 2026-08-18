@@ -8,8 +8,9 @@ import { CameraView } from 'expo-camera'
 import { colors } from '@/constants'
 
 // ─── Regex validasi ─────────────────────────────────────────────
-// Full format: HGP-00-C-AA0001  (productCode-version-finishing-batchCode)
-const FULL_SKU_REGEX = /^[A-Z]{3}-\d{2}-[A-Z]-[A-Z]{2}\d{4}$/
+// Full format: EC6-01-S-AA0001  (typeCode-version-finishing-batchCode)
+// typeCode bisa alfanumerik (EC6, SPY, HGP2 dst) — versi 1-2 digit
+const FULL_SKU_REGEX = /^[A-Z0-9]{1,8}-\d{1,2}-[A-Z]-[A-Z]{2}\d{4}$/
 
 // Fallback format: AA0001 (batch code only, 2 letters + 4 digits)
 const BATCH_REGEX = /^[A-Z]{2}\d{4}$/

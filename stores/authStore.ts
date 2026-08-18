@@ -4,9 +4,9 @@ import { makeRedirectUri } from 'expo-auth-session'
 import { supabase } from '@/lib/supabase'
 import type { AuthStore, User, AuthSession, UserRole } from '@/types'
 
-export const PREMIUM_EMAILS = ['rehanforic@gmail.com', 'hanvankernel@gmail.com', 'adminputrajayametal@gmail.com'];
+export const PREMIUM_EMAILS = ['rehanforic@gmail.com', 'hanvankernel@gmail.com', 'adminputrajayametal@gmail.com', 'sadambsaputra@gmail.com', 'staffputrajayametal@gmail.com'];
 
-export const OWNER_EMAILS = ['rehanforic@gmail.com'];
+export const OWNER_EMAILS = ['rehanforic@gmail.com', 'sadambsaputra@gmail.com'];
 
 /**
  * Whitelist akun ADMIN (akses penuh seperti owner, tapi transaksi wajib

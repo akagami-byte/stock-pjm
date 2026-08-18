@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  View, Text, ScrollView, Dimensions, ActivityIndicator, StyleSheet,
+  View, Text, ScrollView, Dimensions, ActivityIndicator, StyleSheet, Pressable,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LineChart, BarChart } from 'react-native-chart-kit'
 import Card from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { formatCurrency } from '@/utils/formatters'
 import { colors, typography, radius } from '@/constants'
@@ -95,8 +95,20 @@ export default function ReportScreen() {
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
       {/* Header */}
       <View style={styles.header}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/transaction')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
+        </Pressable>
         <Text style={styles.heading}>Laporan Penjualan</Text>
-        <Button title="←" variant="ghost" size="sm" onPress={() => router.back()} />
+        <View style={{ width: 30 }} />
       </View>
 
       {/* Summary */}
@@ -214,8 +226,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: 16, gap: 12 },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.canvas },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  heading: { fontSize: 22, fontWeight: '700', color: colors.ink },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  backBtn: { padding: 4 },
+  heading: { flex: 1, fontSize: 20, fontWeight: '700', color: colors.ink, textAlign: 'center' },
   chartTitle: {
     fontSize: 13, fontWeight: '600', color: colors.muted,
     textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10,

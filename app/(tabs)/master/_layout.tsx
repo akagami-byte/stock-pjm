@@ -11,6 +11,9 @@ export default function MasterLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="create" />
       <Stack.Screen name="[id]" />
+      <Stack.Screen name="product/[id]" />
+      <Stack.Screen name="company/[id]" />
+      <Stack.Screen name="company-create" />
     </Stack>
   )
 }

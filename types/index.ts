@@ -537,6 +537,8 @@ export interface UpdateProductInput {
   description?: string;
   image_url?: string;
   is_active?: boolean;
+  /** Base price per unit in IDR (harga awal) */
+  base_price?: number;
 }
 
 /** Input for creating a new product variant. */
@@ -622,6 +624,10 @@ export interface TransactionLineItem {
   price_per_unit: number;
   /** FK → alternative_prices.alt_price_id (optional) */
   alt_price_id?: string;
+  /** FK → product_variants.variant_id — dipakai untuk auto-save harga khusus */
+  variant_id?: string;
+  /** Harga efektif (base_price + price_modifier) — pembanding apakah harga dimodifikasi */
+  effective_price?: number;
 }
 
 /**

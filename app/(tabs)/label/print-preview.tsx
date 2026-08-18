@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, ScrollView, Alert, StyleSheet, TouchableOpacity } from 'react-native'
+import { View, Text, ScrollView, Alert, StyleSheet, TouchableOpacity, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { useBatchStore } from '@/stores/batchStore'
 import { generateLabelHtml, calculateLabelLayout, PAPER_SIZES, LABEL_SIZES, type LayoutConfig, type BatchLabelItem, type PaperSize, type LabelSize } from '@/utils/labelPrinter'
 import { savePdfToLocal } from '@/services/pdf/savePdf'
@@ -98,7 +99,23 @@ export default function PrintPreviewScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.heading}>Unduh Massal</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/label')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
+        </Pressable>
+        <Text style={styles.heading}>Unduh Massal</Text>
+        <View style={{ width: 30 }} />
+      </View>
       <Text style={styles.subtitle}>{items.length} batch siap diunduh</Text>
 
       {/* Pengaturan Unduh */}
@@ -159,7 +176,9 @@ export default function PrintPreviewScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: 16 },
-  heading: { fontSize: 22, fontWeight: '700', color: colors.ink },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  backBtn: { padding: 4 },
+  heading: { flex: 1, fontSize: 20, fontWeight: '700', color: colors.ink, textAlign: 'center' },
   subtitle: { fontSize: 14, color: colors.muted, marginBottom: 16 },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.body, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

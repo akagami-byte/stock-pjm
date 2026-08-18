@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   View, Text, FlatList, ScrollView, Alert, ActivityIndicator, StyleSheet, Image, Pressable, Modal, TextInput,
 } from 'react-native'
@@ -14,7 +14,7 @@ import { useTransactionStore } from '@/stores/transactionStore'
 import { uploadBarcodePresigned } from '@/services/s3/uploadBarcodePresigned'
 import { formatDate, formatCurrency } from '@/utils/formatters'
 import { colors, radius, spacing, typography } from '@/constants'
-import type { Company, StockBatchWithDetails } from '@/types'
+import type { Company, StockBatchWithDetails, SalesTransactionWithDetails } from '@/types'
 import * as ImagePicker from 'expo-image-picker'
 
 
@@ -30,6 +30,7 @@ export default function CompanyDetailScreen() {
   const [companyTransactions, setCompanyTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'info' | 'batch' | 'transaksi'>('info')
+  const [expandedProduct, setExpandedProduct] = useState<string | null>(null)
 
   // Edit Company State
   const [editModalVisible, setEditModalVisible] = useState(false)
@@ -41,7 +42,30 @@ export default function CompanyDetailScreen() {
 
   useEffect(() => {
     if (id) loadCompany(id)
+    fetchTransactions()
   }, [id])
+
+  // Transaksi penjualan khusus perusahaan ini (company_name free-text)
+  const companyTx = useMemo(
+    () => transactions.filter((t) => t.company_name === company?.company_name),
+    [transactions, company]
+  )
+
+  // Agregasi per nama barang
+  const soldItems = useMemo(() => {
+    const map = new Map<string, SalesTransactionWithDetails[]>()
+    for (const t of companyTx) {
+      const name = t.batch?.variant?.product?.product_name ?? `Batch ${t.batch?.batch_code ?? '—'}`
+      if (!map.has(name)) map.set(name, [])
+      map.get(name)!.push(t)
+    }
+    return Array.from(map.entries()).map(([productName, items]) => ({
+      productName,
+      items,
+      totalQty: items.reduce((sum, i) => sum + i.quantity_sold, 0),
+      lastPrice: items[0]?.price_per_unit ?? 0,
+    }))
+  }, [companyTx])
 
   async function loadCompany(companyId: string) {
     setLoading(true)
@@ -123,6 +147,26 @@ export default function CompanyDetailScreen() {
     }
   }
 
+  const handleDeleteCompany = () => {
+    if (!company) return
+    Alert.alert('Hapus Perusahaan', 'Yakin hapus perusahaan', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await companyStore.deleteCompany(company.company_id)
+            Alert.alert('Sukses', 'Perusahaan berhasil dihapus')
+            router.back()
+          } catch (e: any) {
+            Alert.alert('Error', e?.message ?? 'Gagal menghapus perusahaan')
+          }
+        },
+      },
+    ])
+  }
+
   if (loading) return <View style={[styles.ctr, { paddingTop: insets.top }]}><ActivityIndicator color={colors.brand} /></View>
   if (!company) return (
     <View style={[styles.ctr, { paddingTop: insets.top }]}>
@@ -145,6 +189,12 @@ export default function CompanyDetailScreen() {
         >
           <Text style={styles.editBtnText}>✏️ Edit</Text>
         </Pressable>
+        <Pressable
+          style={[styles.editBtn, styles.deleteBtn]}
+          onPress={handleDeleteCompany}
+        >
+          <Text style={[styles.editBtnText, { color: colors.error }]}>🗑</Text>
+        </Pressable>
       </View>
 
       {/* Tabs */}
@@ -152,7 +202,7 @@ export default function CompanyDetailScreen() {
         {(['info','batch','transaksi'] as const).map(t => (
           <Pressable key={t} style={[styles.tab, tab===t&&styles.tabActive]} onPress={()=>setTab(t)}>
             <Text style={[styles.tabText, tab===t&&styles.tabTextActive]}>
-              {t==='info'?'Info':t==='batch'?'Reserved':'Transaksi'}
+              {t==='info'?'Info':t==='batch'?'Reserved':'Barang Terjual'}
             </Text>
           </Pressable>
         ))}
@@ -185,9 +235,49 @@ export default function CompanyDetailScreen() {
 
       {tab === 'transaksi' && (
         <ScrollView contentContainerStyle={styles.content}>
-          <Text style={{ color: colors.muted, textAlign: 'center', padding: 24 }}>
-            Riwayat transaksi akan tersedia setelah sinkronisasi data.
-          </Text>
+          {soldItems.length === 0 ? (
+            <Text style={{ color: colors.muted, textAlign: 'center', padding: 24 }}>
+              Belum ada barang terjual untuk perusahaan ini.
+            </Text>
+          ) : (
+            soldItems.map((item) => (
+              <View key={item.productName} style={styles.soldCard}>
+                <Pressable
+                  onPress={() => setExpandedProduct(expandedProduct === item.productName ? null : item.productName)}
+                >
+                  <View style={styles.row}>
+                    <Text style={styles.soldName} numberOfLines={1}>
+                      {item.productName}
+                    </Text>
+                    <Text style={styles.soldPrice}>{formatCurrency(item.lastPrice)}</Text>
+                  </View>
+                  <Text style={styles.soldQty}>
+                    Total {item.totalQty} pcs · {item.items.length} transaksi{' '}
+                    {expandedProduct === item.productName ? '▼' : '▶'}
+                  </Text>
+                </Pressable>
+
+                {expandedProduct === item.productName && (
+                  <View style={styles.soldTxList}>
+                    {item.items.map((t) => (
+                      <Pressable
+                        key={t.sales_id}
+                        style={styles.soldTxRow}
+                        onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: t.sales_id } })}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.soldTxInvoice}>{t.invoice_number ?? '—'}</Text>
+                          <Text style={styles.soldTxDate}>{formatDate(t.transaction_date)}</Text>
+                        </View>
+                        <Text style={styles.soldTxQty}>{t.quantity_sold} pcs</Text>
+                        <Text style={styles.soldTxPrice}>{formatCurrency(t.price_per_unit)}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))
+          )}
         </ScrollView>
       )}
 
@@ -294,6 +384,34 @@ const styles = StyleSheet.create({
   lbl: { fontSize: 13, color: colors.muted },
   val: { fontSize: 13, color: colors.body, fontWeight: '500' },
   valDisabled: { fontSize: 13, color: colors.muted, fontWeight: '500' },
+  deleteBtn: { borderColor: colors.error + '55' },
+  soldCard: {
+    backgroundColor: colors.surfaceCard,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    padding: spacing.md,
+    gap: spacing.xxs,
+  },
+  soldName: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.ink },
+  soldPrice: { fontSize: 14, fontWeight: '700', color: colors.success, fontFamily: typography.font.mono },
+  soldQty: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  soldTxList: { marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.hairlineSoft, paddingTop: spacing.xs, gap: spacing.xxs },
+  soldTxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.sm,
+    backgroundColor: colors.canvas,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  soldTxInvoice: { fontSize: 13, fontFamily: typography.font.mono, fontWeight: '600', color: colors.ink },
+  soldTxDate: { fontSize: 11, color: colors.mutedSoft, marginTop: 2 },
+  soldTxQty: { fontSize: 12, color: colors.body, fontWeight: '600' },
+  soldTxPrice: { fontSize: 12, color: colors.success, fontWeight: '700', fontFamily: typography.font.mono },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: spacing.md },
   modalCard: { width: '100%', backgroundColor: colors.canvas, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.xs },
   modalTitle: { fontSize: typography.size.lg, fontWeight: typography.weight.bold, color: colors.ink, marginBottom: spacing.xs },

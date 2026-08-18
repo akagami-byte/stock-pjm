@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import SearchDropdown from '@/components/ui/SearchDropdown'
+import { Icon } from '@/components/ui/Icon'
 import { useProductStore } from '@/stores/productStore'
 import { uploadBarcodePresigned } from '@/services/s3/uploadBarcodePresigned'
 import { colors, typography, radius, spacing, FINISHING_OPTIONS } from '@/constants'
@@ -132,7 +133,23 @@ export default function CreateProductScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.heading}>Tambah Produk Baru</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back()
+              } else {
+                router.replace('/master')
+              }
+            }}
+            style={styles.backBtn}
+          >
+            <Icon name="arrow-left" size={22} color={colors.ink} />
+          </Pressable>
+          <Text style={styles.heading}>Tambah Produk Baru</Text>
+          <View style={{ width: 30 }} />
+        </View>
 
         {step === 'type' && (
           <View style={styles.card}>
@@ -224,7 +241,9 @@ export default function CreateProductScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: 16, paddingBottom: 40 },
-  heading: { fontSize: 22, fontWeight: '700', color: colors.ink, marginBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
+  backBtn: { padding: 4 },
+  heading: { flex: 1, fontSize: 20, fontWeight: '700', color: colors.ink, textAlign: 'center' },
   card: { backgroundColor: colors.canvas, borderRadius: radius.lg, padding: 16, borderWidth: 1, borderColor: colors.hairline },
   stepLabel: { fontSize: 12, color: colors.brand, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: colors.ink, marginBottom: 8 },

@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import { Icon } from '@/components/ui/Icon'
 import { useBatchStore } from '@/stores/batchStore'
 import { colors, typography, radius, spacing } from '@/constants'
 import { formatDate } from '@/utils/formatters'
@@ -134,8 +135,17 @@ export default function CetakMassalScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>‹ Kembali</Text>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/label')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.heading}>Unduh Massal</Text>
         <Text style={styles.subheading}>Pilih batch untuk diunduh label barcode</Text>
@@ -242,12 +252,7 @@ export default function CetakMassalScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   header: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, marginBottom: spacing.xs },
-  backBtn: { alignSelf: 'flex-start', marginBottom: spacing.xs },
-  backText: {
-    fontSize: typography.size.base,
-    color: colors.brand,
-    fontWeight: typography.weight.medium,
-  },
+  backBtn: { padding: 4 },
   heading: {
     fontSize: typography.size.xl,
     fontWeight: typography.weight.bold,

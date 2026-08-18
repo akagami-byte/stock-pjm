@@ -16,6 +16,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import { Icon } from '@/components/ui/Icon'
 import { useProductStore } from '@/stores/productStore'
 import { useBatchStore } from '@/stores/batchStore'
 import { useTransactionStore } from '@/stores/transactionStore'
@@ -62,6 +63,7 @@ export default function ProductTypeDetailScreen() {
   const [editProductModalVisible, setEditProductModalVisible] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [productNameInput, setProductNameInput] = useState('')
+  const [basePriceInput, setBasePriceInput] = useState('')
 
   const [editVariantModalVisible, setEditVariantModalVisible] = useState(false)
   const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
@@ -174,6 +176,7 @@ export default function ProductTypeDetailScreen() {
   const handleOpenEditProduct = (prod: Product) => {
     setEditingProduct(prod)
     setProductNameInput(prod.product_name)
+    setBasePriceInput(String(prod.base_price ?? 0))
     setEditProductModalVisible(true)
   }
 
@@ -183,16 +186,22 @@ export default function ProductTypeDetailScreen() {
       Alert.alert('Error', 'Nama produk tidak boleh kosong')
       return
     }
+    const basePriceNum = parseFloat(basePriceInput)
+    if (isNaN(basePriceNum) || basePriceNum < 0) {
+      Alert.alert('Error', 'Harga awal harus angka valid (≥ 0)')
+      return
+    }
     try {
       await updateProduct(editingProduct.product_id, {
         product_name: productNameInput.trim(),
+        base_price: basePriceNum,
       })
       if (id) {
         const updated = await fetchProductsByType(id)
         setTypeProducts(updated)
       }
       setEditProductModalVisible(false)
-      Alert.alert('Sukses', 'Nama produk berhasil diperbarui')
+      Alert.alert('Sukses', 'Produk berhasil diperbarui')
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Gagal memperbarui produk')
     }
@@ -260,7 +269,7 @@ export default function ProductTypeDetailScreen() {
           <View key={product.product_id}>
             <Pressable
               style={({ pressed }) => [styles.productCard, pressed && styles.cardPressed]}
-              onPress={() => toggleProduct(product.product_id)}
+              onPress={() => router.push({ pathname: '/master/product/[id]', params: { id: product.product_id } })}
             >
               <View style={styles.productRow}>
                 <View style={styles.productInfo}>
@@ -278,9 +287,17 @@ export default function ProductTypeDetailScreen() {
                 >
                   <Text style={styles.editBtnText}>✏️ Edit</Text>
                 </Pressable>
-                <Text style={styles.expandIcon}>
-                  {expandedProductId === product.product_id ? '▼' : '▶'}
-                </Text>
+                <Pressable
+                  style={styles.expandBtn}
+                  onPress={(e) => {
+                    e.stopPropagation()
+                    toggleProduct(product.product_id)
+                  }}
+                >
+                  <Text style={styles.expandIcon}>
+                    {expandedProductId === product.product_id ? '▼' : '▶'}
+                  </Text>
+                </Pressable>
               </View>
             </Pressable>
 
@@ -401,8 +418,17 @@ export default function ProductTypeDetailScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header back */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>‹ Kembali</Text>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+            } else {
+              router.replace('/master')
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-left" size={22} color={colors.ink} />
         </Pressable>
         <Pressable
           style={styles.editHeaderBtn}
@@ -545,11 +571,11 @@ export default function ProductTypeDetailScreen() {
         </View>
       </Modal>
 
-      {/* Modal Edit Nama Produk */}
+      {/* Modal Edit Produk (nama + harga awal) */}
       <Modal visible={editProductModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Edit Nama Produk</Text>
+            <Text style={styles.modalTitle}>Edit Produk</Text>
 
             <Text style={styles.fieldLabel}>Nama Produk</Text>
             <TextInput
@@ -557,6 +583,16 @@ export default function ProductTypeDetailScreen() {
               value={productNameInput}
               onChangeText={setProductNameInput}
               placeholder="Nama produk..."
+              placeholderTextColor={colors.mutedSoft}
+            />
+
+            <Text style={styles.fieldLabel}>Harga Awal (Rp)</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={basePriceInput}
+              onChangeText={setBasePriceInput}
+              keyboardType="numeric"
+              placeholder="0"
               placeholderTextColor={colors.mutedSoft}
             />
 
@@ -608,12 +644,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  backBtn: { alignSelf: 'flex-start', marginBottom: spacing.xxs },
-  backText: {
-    fontSize: typography.size.base,
-    color: colors.brand,
-    fontWeight: typography.weight.medium,
-  },
+  backBtn: { padding: 4 },
   editHeaderBtn: {
     backgroundColor: colors.surfaceCard,
     borderColor: colors.hairline,
@@ -768,6 +799,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   productDetail: { fontSize: typography.size.sm, color: colors.muted, marginTop: 2 },
+  expandBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   expandIcon: { fontSize: 12, color: colors.muted },
   variantsContainer: {
     paddingLeft: spacing.md,
